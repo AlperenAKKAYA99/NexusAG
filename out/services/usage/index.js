@@ -1,0 +1,675 @@
+"use strict";
+/**
+ * UsageStatsService — orchestrates token usage statistics from the Antigravity
+ * Language Server's cascade trajectory endpoints.
+ *
+ * Data flow:
+ * 1. Scan ~/.gemini/antigravity/brain/ for conversation UUIDs
+ * 2. Fetch metadata for each via parallel batched API calls
+ * 3. Aggregate into daily/hourly/model/cascade breakdowns
+ *
+ * Delegates to:
+ * - aggregator.ts — pure aggregation functions
+ * - cache.ts — disk cache persistence
+ * - types.ts — shared types and constants
+ */
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.UsageStatsService = void 0;
+const fs = __importStar(require("fs"));
+const path = __importStar(require("path"));
+const rpcDirectClient_1 = require("../rpcDirectClient");
+const lsClient_1 = require("../../utils/lsClient");
+const logger_1 = require("../../utils/logger");
+const types_1 = require("./types");
+const aggregator_1 = require("./aggregator");
+const cache_1 = require("./cache");
+const processLock_1 = require("./processLock");
+const titleResolver_1 = require("../../shared/titleResolver");
+const pool_1 = require("./pool");
+const agPaths_1 = require("../../shared/agPaths");
+const log = (0, logger_1.createLogger)('UsageStats');
+class UsageStatsService {
+    /** Memory cache for deep stats (expensive to compute) */
+    deepStatsCache = null;
+    /** In-memory per-convo data — available during progressive fetch before disk cache exists */
+    currentPerConvo = {};
+    currentTitleMap = new Map();
+    currentStepCounts = new Map();
+    /** Raw (pre-dedup) meta/steps counts per conversation — for correct offset-based delta */
+    rawFetchCounts = {};
+    cache = new cache_1.StatsCache();
+    processLock = new processLock_1.ProcessLock();
+    // ═══════════════════════════════════════════
+    //  Deep Stats (All-Time, All Conversations)
+    // ═══════════════════════════════════════════
+    async fetchDeepStats(serverInfo, forceRefresh = false, 
+    /** Called when background backfill completes with updated stats */
+    onBackfillComplete, 
+    /** Called during scan with (done, total) for progress UI */
+    onProgress) {
+        log.diag(`fetchDeepStats: port=${serverInfo.port} forceRefresh=${forceRefresh} memCache=${!!this.deepStatsCache}`);
+        // 1. Instant return from memory cache (fastest) — skip if forceRefresh
+        if (this.deepStatsCache && !forceRefresh) {
+            return this.deepStatsCache;
+        }
+        // 2. Try disk cache + incremental refresh (picks up new conversations)
+        const diskCache = this.cache.read();
+        if (diskCache) {
+            this.deepStatsCache = diskCache.stats;
+            log.diag(`fetchDeepStats: disk cache hit — ${diskCache.fetchedIds.length} conversations`);
+            // Cross-process lock: only 1 window fetches, others read cache only
+            if (!this.processLock.acquire()) {
+                return this.deepStatsCache;
+            }
+            try {
+                const updated = await this.incrementalRefresh(serverInfo, diskCache).catch((e) => {
+                    log.warn('fetchDeepStats: incrementalRefresh threw:', e?.message);
+                    return false;
+                });
+                if (updated && onBackfillComplete)
+                    onBackfillComplete(this.deepStatsCache);
+            }
+            finally {
+                this.processLock.release();
+            }
+            return this.deepStatsCache;
+        }
+        // 3. Two-phase fetch (first time only — no disk cache exists)
+        log.diag('fetchDeepStats: no disk cache — cold two-phase fetch');
+        //    Lock guard: only 1 window does the expensive cold boot
+        if (!this.processLock.acquire()) {
+            log.diag('fetchDeepStats: lock held by another instance — returning null');
+            return null;
+        }
+        try {
+            return await this.twoPhaseFullFetch(serverInfo, onBackfillComplete, onProgress);
+        }
+        finally {
+            this.processLock.release();
+        }
+    }
+    /**
+     * Two-phase full fetch:
+     * Phase 1: Fetch recent conversations (mtime < 48h) → return immediately for 24h view
+     * Phase 2: Backfill remaining conversations in background → notify via callback
+     */
+    async twoPhaseFullFetch(serverInfo, onBackfillComplete, onProgress) {
+        try {
+            this.rawFetchCounts = {};
+            const brainDir = agPaths_1.BRAIN_DIR;
+            const allIds = this.discoverConversationIds();
+            if (allIds.length === 0) {
+                log.warn('twoPhaseFullFetch: NO conversations found on disk — check brain dir exists and contains UUID folders');
+                const emptyStats = (0, aggregator_1.aggregateFromPerConvo)({}, new Map());
+                this.deepStatsCache = emptyStats;
+                if (onBackfillComplete)
+                    onBackfillComplete(emptyStats);
+                return emptyStats;
+            }
+            // Split into HOT (recent 48h) and COLD
+            const cutoffMs = Date.now() - types_1.HOT_THRESHOLD_MS;
+            const { hot, cold } = this.partitionByMtime(allIds, cutoffMs);
+            log.diag(`twoPhaseFullFetch: ${hot.length} hot + ${cold.length} cold = ${allIds.length} total`);
+            // Phase 1: Fetch HOT conversations + trajectory summaries (titles + stepCounts)
+            const [summaries, hotData] = await Promise.all([
+                this.fetchTrajectorySummaries(serverInfo),
+                this.fetchConversationData(serverInfo, hot, onProgress ? (d) => onProgress(d, allIds.length) : undefined),
+            ]);
+            log.diag(`twoPhaseFullFetch: Phase 1 API done — titleMap=${summaries.titleMap.size} titles, stepCounts=${summaries.stepCounts.size}, hotData=${Object.keys(hotData).length} convos with data`);
+            this.currentTitleMap = summaries.titleMap;
+            this.currentStepCounts = summaries.stepCounts;
+            this.currentPerConvo = { ...hotData };
+            const hotStats = (0, aggregator_1.aggregateFromPerConvo)(hotData, summaries.titleMap);
+            this.deepStatsCache = hotStats;
+            log.diag(`twoPhaseFullFetch: Phase 1 aggregated — totalCalls=${hotStats.totalCalls} totalTokens=${hotStats.totalTokens} from ${hot.length} hot convos`);
+            // If no cold conversations, write final cache and return
+            if (cold.length === 0) {
+                log.diag('twoPhaseFullFetch: no cold conversations — writing cache and returning Phase 1 result');
+                const entryCounts = this.buildEntryCounts();
+                this.cache.write(hotData, allIds, hotStats, summaries.titleMap, summaries.stepCounts, entryCounts);
+                return hotStats;
+            }
+            // Phase 2: Fetch COLD conversations inline (not background).
+            // Returning partial Phase 1 data caused flip-flop ($3 → $177 → $203).
+            // Await full result so the UI transitions once: loading → correct data.
+            const hotDone = hot.length;
+            const coldData = await this.fetchConversationData(serverInfo, cold, onProgress ? (d) => onProgress(hotDone + d, allIds.length) : undefined);
+            log.diag(`twoPhaseFullFetch: Phase 2 API done — coldData=${Object.keys(coldData).length} convos with data`);
+            const merged = { ...hotData, ...coldData };
+            this.currentPerConvo = merged;
+            const fullStats = (0, aggregator_1.aggregateFromPerConvo)(merged, summaries.titleMap);
+            this.deepStatsCache = fullStats;
+            // Build entryCounts for offset-based delta on next incremental
+            const entryCounts = this.buildEntryCounts();
+            this.cache.write(merged, allIds, fullStats, summaries.titleMap, summaries.stepCounts, entryCounts);
+            log.info(`twoPhaseFullFetch: done — ${fullStats.totalCalls} calls, ${Object.keys(merged).length} convos`);
+            if (onBackfillComplete)
+                onBackfillComplete(fullStats);
+            return fullStats;
+        }
+        catch (e) {
+            log.warn('twoPhaseFullFetch: FAILED with error:', e?.message);
+            log.warn('twoPhaseFullFetch: stack:', e?.stack?.split('\n').slice(0, 5).join(' | '));
+            return null;
+        }
+    }
+    /**
+     * Partition conversation IDs into hot (mtime > cutoff) and cold.
+     */
+    partitionByMtime(ids, cutoffMs) {
+        const brainDir = agPaths_1.BRAIN_DIR;
+        const hot = [];
+        const cold = [];
+        for (const cid of ids) {
+            try {
+                const stat = fs.statSync(path.join(brainDir, cid));
+                if (stat.mtimeMs > cutoffMs) {
+                    hot.push(cid);
+                }
+                else {
+                    cold.push(cid);
+                }
+            }
+            catch { // EXPECTED: directory deleted between readdir and stat — treat as hot
+                // Can't stat → treat as hot (fetch it)
+                hot.push(cid);
+            }
+        }
+        return { hot, cold };
+    }
+    /**
+     * Incremental refresh — fetches NEW conversations + re-fetches MODIFIED ones.
+     * Uses filesystem mtime to detect conversations that changed since last cache update.
+     */
+    async incrementalRefresh(serverInfo, diskCache) {
+        try {
+            this.rawFetchCounts = {};
+            const allIds = this.discoverConversationIds();
+            const cachedSet = new Set(diskCache.fetchedIds);
+            log.diag(`incrementalRefresh: disk has ${allIds.length} convos, cache has ${cachedSet.size} fetched IDs`);
+            // 1. NEW conversations (not in cache at all)
+            const newIds = allIds.filter(id => !cachedSet.has(id));
+            log.diag(`incrementalRefresh: ${newIds.length} new conversations not in cache`);
+            // 2. CHANGED conversations — precise stepCount delta detection
+            //    Compare server's current stepCount vs our cached stepCount.
+            //    Only re-fetch conversations where steps actually increased.
+            const summaries = await this.fetchTrajectorySummaries(serverInfo);
+            this.currentTitleMap = summaries.titleMap;
+            this.currentStepCounts = summaries.stepCounts;
+            const cachedStepCounts = diskCache.stepCounts || {};
+            const changedIds = allIds.filter(id => {
+                if (!cachedSet.has(id))
+                    return false; // already in newIds
+                const currentCount = summaries.stepCounts.get(id) ?? 0;
+                const cachedCount = cachedStepCounts[id] ?? 0;
+                return currentCount > cachedCount;
+            });
+            log.diag(`incrementalRefresh: ${changedIds.length} conversations changed (stepCount delta)`);
+            const dirtyIds = [...new Set([...newIds, ...changedIds])];
+            if (dirtyIds.length === 0) {
+                log.info('incrementalRefresh: nothing to fetch — all conversations up to date');
+                return false;
+            }
+            // Build offset map for changed conversations (new ones start at 0)
+            const cachedEntryCounts = diskCache.entryCounts || {};
+            const offsetMap = new Map();
+            for (const cid of changedIds) {
+                const cached = cachedEntryCounts[cid];
+                if (cached)
+                    offsetMap.set(cid, cached);
+            }
+            log.info(`incrementalRefresh: fetching ${dirtyIds.length} dirty (${newIds.length} new + ${changedIds.length} changed)`);
+            const deltaCount = [...offsetMap.values()].filter(v => v.meta > 0 || v.steps > 0).length;
+            log.info(`Deep stats: incremental fetch — ${newIds.length} new, ${changedIds.length} changed (${deltaCount} offset-based delta)`);
+            const freshData = await this.fetchConversationData(serverInfo, dirtyIds, undefined, offsetMap);
+            // ADDITIVE merge: never delete entries, only add new unique ones.
+            // Prevents flip-flop when steps endpoint sporadically returns empty.
+            const merged = { ...diskCache.perConvo };
+            for (const [cid, fresh] of Object.entries(freshData)) {
+                const existing = merged[cid];
+                if (!existing) {
+                    merged[cid] = fresh;
+                }
+                else {
+                    const byFingerprint = new Map();
+                    for (const e of existing.entries) {
+                        byFingerprint.set((0, types_1.entryFingerprint)(e), e);
+                    }
+                    let changed = false;
+                    for (const e of fresh.entries) {
+                        const fp = (0, types_1.entryFingerprint)(e);
+                        const previous = byFingerprint.get(fp);
+                        const next = previous ? (0, types_1.mergePreferredEntry)(previous, e) : e;
+                        if (!previous || next !== previous)
+                            changed = true;
+                        byFingerprint.set(fp, next);
+                    }
+                    if (changed) {
+                        merged[cid] = { entries: [...byFingerprint.values()] };
+                    }
+                }
+            }
+            const mergedIds = [...new Set([...diskCache.fetchedIds, ...newIds])];
+            // Build entryCounts from raw (pre-dedup) fetch counts.
+            // Meta/steps use independent LS offsets — must NOT mix via deduped entry count.
+            const entryCounts = this.buildEntryCounts(cachedEntryCounts);
+            const stats = (0, aggregator_1.aggregateFromPerConvo)(merged, summaries.titleMap);
+            this.deepStatsCache = stats;
+            this.currentPerConvo = merged;
+            this.cache.write(merged, mergedIds, stats, summaries.titleMap, summaries.stepCounts, entryCounts);
+            log.info(`incrementalRefresh: complete — totalCalls=${stats.totalCalls} (${newIds.length} new + ${changedIds.length} changed convos updated)`);
+            return true;
+        }
+        catch (e) {
+            log.warn('incrementalRefresh: FAILED:', e?.message);
+            return false;
+        }
+    }
+    /**
+     * Fetch metadata for conversation IDs (parallel chunks).
+     * Hybrid: RPC Direct (HTTPS) first, HTTP fallback on failure.
+     */
+    async fetchConversationData(serverInfo, conversationIds, onProgress, 
+    /** Per-conversation offsets for delta fetch (incrementalRefresh only) */
+    offsetMap) {
+        const result = {};
+        if (conversationIds.length === 0) {
+            log.diag('fetchConversationData: called with 0 conversations — returning empty');
+            return result;
+        }
+        const rpc = new rpcDirectClient_1.RpcDirectClient(serverInfo);
+        const rpcAvailable = rpc.isAvailable();
+        log.diag(`fetchConversationData: ${conversationIds.length} conversations — RPC available=${rpcAvailable} (httpsPort=${serverInfo.httpsPort ?? 'none'})`);
+        let useRpc = false;
+        if (rpcAvailable) {
+            try {
+                useRpc = await rpc.heartbeat();
+                log.diag(`fetchConversationData: RPC heartbeat ${useRpc ? '✓ validated' : '✗ failed'} on port ${serverInfo.httpsPort}`);
+            }
+            catch (e) {
+                log.diag('fetchConversationData: RPC heartbeat threw:', e?.message);
+            }
+        }
+        else {
+            log.diag(`fetchConversationData: RPC not available — httpsPort is ${serverInfo.httpsPort} — will use HTTP fallback`);
+        }
+        let processed = 0;
+        let withEntries = 0;
+        await (0, pool_1.concurrentPool)(conversationIds, async (cid) => {
+            const offsets = offsetMap?.get(cid);
+            const entries = await this.fetchAndDedup(serverInfo, rpc, useRpc, cid, 1, offsets?.meta ?? 0, offsets?.steps ?? 0);
+            if (entries.length > 0) {
+                result[cid] = { entries };
+                withEntries++;
+            }
+        }, types_1.BATCH_CONCURRENCY, () => { this.processLock.heartbeat(); processed++; onProgress?.(processed); });
+        log.diag(`fetchConversationData: pool done — ${processed} processed, ${withEntries}/${conversationIds.length} had token data`);
+        // Retry: conversations with known stepCounts but 0 entries (timeout under load)
+        if (this.currentStepCounts) {
+            const missed = conversationIds.filter(cid => !(cid in result) && (this.currentStepCounts?.get(cid) ?? 0) > 0);
+            if (missed.length > 0) {
+                log.diag(`fetchConversationData: retrying ${missed.length} missed conversations (serial)`);
+                let retryHits = 0;
+                await (0, pool_1.concurrentPool)(missed, async (cid) => {
+                    // Retry always does full fetch (offset=0) — the delta may have been the issue
+                    const entries = await this.fetchAndDedup(serverInfo, rpc, false, cid, 2, 0, 0);
+                    if (entries.length > 0) {
+                        result[cid] = { entries };
+                        retryHits++;
+                        log.diag(`fetchConversationData: RETRY OK: ${cid.substring(0, 12)} — ${entries.length} entries`);
+                    }
+                }, 1);
+                if (retryHits > 0)
+                    log.info(`fetchConversationData: retry recovered ${retryHits}/${missed.length}`);
+            }
+            else {
+                const zeroEntryCount = conversationIds.filter(cid => !(cid in result)).length;
+                if (zeroEntryCount > 0) {
+                    log.diag(`fetchConversationData: ${zeroEntryCount} conversations returned 0 entries and had 0 stepCount (likely empty/no-op)`);
+                }
+            }
+        }
+        return result;
+    }
+    /** Fetch meta+steps for a single conversation, merge, and dedup. */
+    async fetchAndDedup(serverInfo, rpc, useRpc, cid, timeoutMultiplier, startMetaOffset = 0, startStepOffset = 0) {
+        const STEPS_TIMEOUT = 20000 * timeoutMultiplier;
+        const META_TIMEOUT = types_1.FETCH_TIMEOUT_MS * timeoutMultiplier;
+        // RPC Direct doesn't support offset — use only for full fetch (offset=0)
+        const canRpc = useRpc && startMetaOffset === 0 && startStepOffset === 0;
+        const [metaResult, stepsResult] = await Promise.allSettled([
+            this.fetchMetaForConvo(serverInfo, rpc, canRpc, cid, META_TIMEOUT, startMetaOffset),
+            this.fetchStepsForConvo(serverInfo, rpc, canRpc, cid, STEPS_TIMEOUT, startStepOffset),
+        ]);
+        const meta = metaResult.status === 'fulfilled' ? metaResult.value : null;
+        const steps = stepsResult.status === 'fulfilled' ? stepsResult.value : null;
+        // Track raw counts BEFORE dedup — meta/steps use independent LS offsets
+        this.rawFetchCounts[cid] = {
+            meta: startMetaOffset + (meta?.length ?? 0),
+            steps: startStepOffset + (steps?.length ?? 0),
+        };
+        const metaEntries = meta ? this.extractEntries(meta) : [];
+        const stepEntries = steps ? this.extractStepEntries(steps) : [];
+        return this.dedupEntries([...metaEntries, ...stepEntries]);
+    }
+    /**
+     * Fetch ALL metadata for a conversation using cumulative-offset pagination.
+     *
+     * The LS caps each response at ~8 MB, so large conversations (4000+ entries)
+     * require multiple calls. The `generator_metadata_offset` parameter skips
+     * that many entries from the start. We use the cumulative item count as
+     * the next offset and stop when no new items arrive.
+     *
+     * History: paginateAll (pre-b61) produced 20× redundant 8 MB payloads
+     * because it re-fetched overlapping ranges without a proper stop condition.
+     */
+    async fetchMetaForConvo(serverInfo, rpc, useRpc, cid, timeout, startOffset = 0) {
+        if (useRpc) {
+            const result = await rpc.getMetadata(cid);
+            if (result)
+                return result;
+        }
+        const all = [];
+        let offset = startOffset;
+        for (let pg = 0; pg < 30; pg++) {
+            const resp = await (0, lsClient_1.callLsJson)(serverInfo, types_1.EP.METADATA, { cascade_id: cid, generator_metadata_offset: offset }, timeout).catch((err) => { log.warn(`Meta page ${pg} for ${cid.substring(0, 8)}: ${err?.message}`); return null; });
+            const items = resp?.generatorMetadata || resp?.generator_metadata || [];
+            if (items.length === 0)
+                break;
+            all.push(...items);
+            offset = startOffset + all.length;
+        }
+        return all.length > 0 ? all : null;
+    }
+    /**
+     * Fetch ALL steps for a conversation using cumulative-offset pagination.
+     * Same strategy as fetchMetaForConvo — cumulative offset until exhausted.
+     */
+    async fetchStepsForConvo(serverInfo, rpc, useRpc, cid, timeout, startOffset = 0) {
+        if (useRpc) {
+            const result = await rpc.getSteps(cid);
+            if (result)
+                return result;
+        }
+        const all = [];
+        let offset = startOffset;
+        for (let pg = 0; pg < 30; pg++) {
+            const resp = await (0, lsClient_1.callLsJson)(serverInfo, types_1.EP.STEPS, { cascade_id: cid, step_offset: offset }, timeout).catch((err) => { log.warn(`Steps page ${pg} for ${cid.substring(0, 8)}: ${err?.message}`); return null; });
+            const items = resp?.steps || [];
+            if (items.length === 0)
+                break;
+            all.push(...items);
+            offset = startOffset + all.length;
+        }
+        return all.length > 0 ? all : null;
+    }
+    /** Dedup usage entries by responseId when present, preferring metadata over steps. */
+    dedupEntries(entries) {
+        const byFingerprint = new Map();
+        for (const e of entries) {
+            const fp = (0, types_1.entryFingerprint)(e);
+            const existing = byFingerprint.get(fp);
+            byFingerprint.set(fp, existing ? (0, types_1.mergePreferredEntry)(existing, e) : e);
+        }
+        return [...byFingerprint.values()];
+    }
+    /**
+     * Build per-conversation entry counts for offset-based delta fetch.
+     * Uses raw (pre-dedup) meta/steps counts from rawFetchCounts.
+     * Critical: generator_metadata_offset and step_offset are independent
+     * LS-side counters. Using deduped entry count (meta+steps combined)
+     * would produce offset > totalMeta → LS returns 0 → silent data loss.
+     */
+    buildEntryCounts(existingCounts) {
+        return { ...(existingCounts || {}), ...this.rawFetchCounts };
+    }
+    /**
+     * Re-aggregate stats with a date range filter.
+     * Called when user changes time range (24h/7d/30d/all).
+     * Prefers in-memory data to avoid redundant disk I/O.
+     */
+    getFilteredStats(range) {
+        // Prefer memory → disk fallback
+        let perConvo = null;
+        let titleMap = this.currentTitleMap;
+        if (Object.keys(this.currentPerConvo).length > 0) {
+            perConvo = this.currentPerConvo;
+        }
+        else {
+            const diskCache = this.cache.read();
+            if (diskCache) {
+                perConvo = diskCache.perConvo;
+                titleMap = diskCache.titleMap
+                    ? new Map(Object.entries(diskCache.titleMap))
+                    : this.currentTitleMap;
+            }
+        }
+        if (!perConvo)
+            return this.deepStatsCache;
+        let dateFilter = '';
+        if (range !== 'all') {
+            const now = new Date();
+            let cutoff = null;
+            let upperBound = null;
+            switch (range) {
+                // Rolling presets (relative to now)
+                case '24h':
+                    cutoff = new Date(now.getTime() - 86400000);
+                    break;
+                case '7d':
+                    cutoff = new Date(now.getTime() - 7 * 86400000);
+                    break;
+                case '30d':
+                    cutoff = new Date(now.getTime() - 30 * 86400000);
+                    break;
+                // Calendar presets (midnight-aligned)
+                case 'today':
+                    cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    break;
+                case 'this-week': {
+                    const dayOfWeek = now.getDay() || 7; // Mon=1, Sun=7
+                    cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek + 1);
+                    break;
+                }
+                case 'this-month':
+                    cutoff = new Date(now.getFullYear(), now.getMonth(), 1);
+                    break;
+                case 'last-month':
+                    cutoff = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                    upperBound = new Date(now.getFullYear(), now.getMonth(), 1);
+                    break;
+                default: break;
+            }
+            if (cutoff) {
+                dateFilter = upperBound
+                    ? { from: cutoff.toISOString(), to: upperBound.toISOString() }
+                    : cutoff.toISOString();
+            }
+        }
+        return (0, aggregator_1.aggregateFromPerConvo)(perConvo, titleMap, dateFilter);
+    }
+    // ─── Trajectory Summaries (titles + stepCounts) ───
+    async fetchTrajectorySummaries(serverInfo) {
+        const titleMap = new Map();
+        const stepCounts = new Map();
+        // Phase 1: Fetch global data directly from state.vscdb (SSOT for all workspaces)
+        try {
+            const globalData = await (0, titleResolver_1.getGlobalIndexData)();
+            for (const [id, title] of globalData.titleMap.entries()) {
+                titleMap.set(id, title);
+            }
+            for (const [id, count] of globalData.stepCounts.entries()) {
+                stepCounts.set(id, count);
+            }
+            log.info(`fetchTrajectorySummaries: loaded ${globalData.titleMap.size} titles, ${globalData.stepCounts.size} stepCounts from vscdb`);
+        }
+        catch (e) {
+            log.warn('Failed to fetch global index data:', e.message);
+        }
+        // Phase 2: Fetch current workspace stats via LS
+        try {
+            const trajResp = await (0, lsClient_1.callLsJson)(serverInfo, types_1.EP.TRAJECTORIES, {});
+            if (!trajResp) {
+                log.warn('fetchTrajectorySummaries: API returned null/empty response — LS may be offline or on wrong port');
+                return { titleMap, stepCounts };
+            }
+            const sums = trajResp?.trajectorySummaries || {};
+            const entries = Object.entries(sums);
+            // Debug: log first entry's field names to help diagnose schema changes
+            if (entries.length > 0) {
+                const [firstId, firstVal] = entries[0];
+                log.diag(`fetchTrajectorySummaries: sample fields for ${firstId.substring(0, 12)}: [${Object.keys(firstVal).join(', ')}]`);
+            }
+            else {
+                log.warn('fetchTrajectorySummaries: trajectorySummaries is empty — no conversations visible to this LS instance');
+                log.warn(`fetchTrajectorySummaries: raw response keys: [${Object.keys(trajResp).join(', ')}]`);
+            }
+            for (const [id, v] of entries) {
+                const val = v;
+                const title = val.summary || val.title || val.displayName || val.name || val.description || '';
+                // LS titles have highest fidelity for the current workspace, so override if present
+                if (title)
+                    titleMap.set(id, title);
+                else if (!titleMap.has(id))
+                    titleMap.set(id, 'Untitled');
+                const sc = parseInt(val.stepCount || '0', 10);
+                if (sc > 0)
+                    stepCounts.set(id, sc);
+            }
+            log.diag(`fetchTrajectorySummaries: done — ${titleMap.size} titles, ${stepCounts.size} with stepCounts`);
+        }
+        catch (e) {
+            log.warn('fetchTrajectorySummaries: FAILED:', e?.message);
+        }
+        return { titleMap, stepCounts };
+    }
+    /**
+     * Synchronous disk cache load — returns pre-aggregated stats instantly.
+     * Called during refresh() to populate usage stats BEFORE the first webview render.
+     * Returns null if no cache exists (triggers full async fetch instead).
+     */
+    loadFromDiskCacheSync() {
+        if (this.deepStatsCache)
+            return this.deepStatsCache;
+        const result = this.cache.loadSync(this.currentTitleMap);
+        if (!result)
+            return null;
+        this.currentTitleMap = result.titleMap;
+        // NOTE: intentionally NOT setting this.deepStatsCache here.
+        // The quotaManager stores this in lastUsageStats.
+        // Keeping deepStatsCache empty allows fetchDeepStats() to proceed
+        // to incrementalRefresh() for fresh data from the language server.
+        return result.stats;
+    }
+    /** Scan ~/.gemini/antigravity/brain/ for conversation UUIDs */
+    discoverConversationIds() {
+        const brainDir = agPaths_1.BRAIN_DIR;
+        if (!fs.existsSync(brainDir)) {
+            log.warn(`discoverConversationIds: brain dir does not exist: ${brainDir}`);
+            return [];
+        }
+        const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        try {
+            const allEntries = fs.readdirSync(brainDir, { withFileTypes: true });
+            const uuidDirs = allEntries.filter(d => d.isDirectory() && UUID_RE.test(d.name));
+            log.diag(`discoverConversationIds: brain dir has ${allEntries.length} total entries, ${uuidDirs.length} are UUID conversation dirs`);
+            return uuidDirs.map(d => d.name);
+        }
+        catch (e) {
+            log.warn(`discoverConversationIds: failed to read brain dir: ${e?.message}`);
+            return [];
+        }
+    }
+    // ─── Response Extractors ───
+    /** Extract TokenEntry[] from metadata items array */
+    extractEntries(items) {
+        const entries = [];
+        for (const item of items) {
+            const cm = item.chatModel || item.chat_model || {};
+            const usage = cm.usage || {};
+            const { inp, out, cache, cacheWrite, reasoning } = (0, aggregator_1.extractTokens)(usage);
+            if (inp === 0 && out === 0 && cache === 0 && cacheWrite === 0 && reasoning === 0)
+                continue;
+            const rawModel = cm.responseModel || cm.response_model || usage.model || cm.model || 'Unknown';
+            const apiProvider = usage.apiProvider || usage.api_provider || '';
+            const responseId = usage.responseId || usage.response_id || '';
+            const ts = cm.chatStartMetadata?.createdAt || cm.chat_start_metadata?.created_at || '';
+            entries.push({
+                responseId: responseId || undefined,
+                source: 'metadata',
+                inp, out, cache, cacheWrite, reasoning,
+                model: rawModel,
+                provider: apiProvider,
+                ts,
+            });
+        }
+        return entries;
+    }
+    /** Extract TokenEntry[] from steps items array */
+    extractStepEntries(steps) {
+        const entries = [];
+        for (const step of steps) {
+            const usage = step.modelUsage || step.model_usage || step.metadata?.modelUsage || {};
+            const rawModel = usage.model || 'Unknown';
+            const { inp, out, cache, cacheWrite, reasoning } = (0, aggregator_1.extractTokens)(usage);
+            if (inp === 0 && out === 0 && cache === 0 && cacheWrite === 0 && reasoning === 0)
+                continue;
+            const responseId = usage.responseId || usage.response_id || '';
+            // Protobuf schema: real timestamp lives inside step.metadata (CortexStepMetadata)
+            const meta = step.metadata || {};
+            let ts = meta.createdAt || meta.created_at || meta.startedAt || meta.started_at
+                || step.createdAt || step.created_at || step.startTime || step.start_time || '';
+            // Handle stepTimestamp (varint epoch from GetCascadeTrajectory's TrajectoryStep wrapper)
+            if (!ts) {
+                const epoch = Number(step.stepTimestamp || step.step_timestamp || 0);
+                if (epoch > 1e9) {
+                    ts = new Date(epoch > 1e12 ? epoch : epoch * 1000).toISOString();
+                }
+            }
+            entries.push({
+                responseId: responseId || undefined,
+                source: 'steps',
+                inp, out, cache, cacheWrite, reasoning,
+                model: rawModel,
+                provider: '',
+                ts,
+            });
+        }
+        return entries;
+    }
+}
+exports.UsageStatsService = UsageStatsService;
+//# sourceMappingURL=index.js.map
