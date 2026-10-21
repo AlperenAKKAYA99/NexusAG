@@ -1,0 +1,17 @@
+{
+  "status": "verified",
+  "version": "7.3.1",
+  "profile": "Pro-Plus",
+  "files_total": 163,
+  "files_verified": 160,
+  "files_downloaded": 20,
+  "files_reused": 140,
+  "files_missing": 0,
+  "files_modified": 0,
+  "files_unexpected": 0,
+  "files_failed": 0,
+  "saved_bandwidth_percent": 96.4,
+  "missing": [],
+  "modified": [],
+  "unexpected": []
+}

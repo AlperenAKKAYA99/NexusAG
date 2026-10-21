@@ -1,0 +1,205 @@
+{
+  "name": "nexus-ag",
+  "displayName": "NexusAG",
+  "description": "Switch between Antigravity accounts instantly. Monitor AI quotas, token budgets and reset timers — all in one sidebar panel.",
+  "icon": "assets/icons/icon.png",
+  "version": "1.1.0",
+  "publisher": "AlperenAKKAYA99",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AlperenAKKAYA99/NexusAG"
+  },
+  "homepage": "https://github.com/AlperenAKKAYA99/NexusAG#readme",
+  "bugs": {
+    "url": "https://github.com/AlperenAKKAYA99/NexusAG/issues"
+  },
+  "categories": [
+    "Other",
+    "Visualization"
+  ],
+  "keywords": [
+    "antigravity",
+    "ai",
+    "quota",
+    "multi-account",
+    "switchboard",
+    "nexusag"
+  ],
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "ag-switchboard",
+          "title": "NexusAG",
+          "icon": "assets/icons/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "ag-switchboard": [
+        {
+          "type": "webview",
+          "id": "ag.quotaView",
+          "name": "Accounts",
+          "icon": "assets/icons/icon.svg"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "ag.refreshQuota",
+        "title": "NexusAG: Refresh Quota",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "ag.addAccount",
+        "title": "NexusAG: Add Account",
+        "icon": "$(add)"
+      },
+      {
+        "command": "ag.removeAccount",
+        "title": "NexusAG: Remove Account",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "ag.addAccountByToken",
+        "title": "NexusAG: Add Account via Token",
+        "icon": "$(key)"
+      },
+      {
+        "command": "ag.openUsageStats",
+        "title": "NexusAG: Open Usage Statistics",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "ag.fixConversations",
+        "title": "NexusAG: Fix Missing Conversations",
+        "icon": "$(wrench)"
+      }
+    ],
+    "menus": {},
+    "configuration": {
+      "title": "NexusAG",
+      "properties": {
+        "ag-switchboard.language": {
+          "type": "string",
+          "default": "auto",
+          "enum": [
+            "auto",
+            "en",
+            "tr",
+            "pt-BR",
+            "es",
+            "de",
+            "fr",
+            "ja",
+            "zh-CN",
+            "hi",
+            "ru"
+          ],
+          "enumDescriptions": [
+            "Auto-detect from system",
+            "English",
+            "Türkçe",
+            "Português (Brasil)",
+            "Español",
+            "Deutsch",
+            "Français",
+            "日本語",
+            "简体中文",
+            "हिन्दी",
+            "Русский"
+          ],
+          "description": "Display language for NexusAG panel. 'auto' detects your VS Code language."
+        },
+        "ag-switchboard.modelPricing": {
+          "type": "object",
+          "description": "Model pricing per 1M tokens. Keys: model tier. Values: { input, output, cache }.",
+          "default": {
+            "opus": {
+              "input": 5,
+              "output": 25,
+              "cache": 0.5
+            },
+            "sonnet": {
+              "input": 3,
+              "output": 15,
+              "cache": 0.3
+            },
+            "haiku": {
+              "input": 1,
+              "output": 5,
+              "cache": 0.1
+            },
+            "gemini-3-pro": {
+              "input": 2,
+              "output": 12,
+              "cache": 0.2
+            },
+            "gemini-3-flash": {
+              "input": 0.5,
+              "output": 3,
+              "cache": 0.05
+            },
+            "gemini-2-pro": {
+              "input": 1.25,
+              "output": 10,
+              "cache": 0.125
+            },
+            "gemini-2-flash": {
+              "input": 0.3,
+              "output": 2.5,
+              "cache": 0.03
+            },
+            "flash-lite": {
+              "input": 0.1,
+              "output": 0.4,
+              "cache": 0.01
+            },
+            "gpt-oss": {
+              "input": 2.5,
+              "output": 10,
+              "cache": 0.25
+            }
+          }
+        },
+        "ag-switchboard.diagnosticMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable verbose file logging to /tmp/ag-ctx-diag.log for troubleshooting. Restart not required."
+        },
+        "ag-switchboard.switchWithFixConversations": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically run Fix Missing Conversations and relaunch Antigravity when switching accounts to keep conversation index intact."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "sync:version": "node scripts/sync-version.js",
+    "verify:i18n": "node scripts/verify-i18n.js",
+    "compile": "npm run sync:version && npm run compile:extension && npm run compile:webview && npm run verify:i18n",
+    "compile:extension": "node scripts/sync-version.js && tsc -p ./tsconfig.extension.json",
+    "compile:webview": "node esbuild.webview.mjs",
+    "watch": "node scripts/sync-version.js && tsc -watch -p ./tsconfig.extension.json",
+    "watch:webview": "node esbuild.webview.mjs --watch",
+    "package": "node scripts/sync-version.js && npm run compile:extension && node esbuild.webview.mjs --production && vsce package --no-dependencies -o dist/",
+    "publish:ovsx": "ovsx publish dist/*.vsix"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/vscode": "^1.80.0",
+    "@vscode/vsce": "^3.0.0",
+    "esbuild": "^0.28.0",
+    "typescript": "^5.4.0"
+  }
+}

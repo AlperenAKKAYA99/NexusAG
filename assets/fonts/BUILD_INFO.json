@@ -1,0 +1,18 @@
+{
+  "version": "7.3.1",
+  "profile": "Pro-Plus",
+  "repository": "user05-ioemlak/FaFaProFree",
+  "generated_at": "2026-09-15T12:58:16.672336",
+  "generator": "fa_pro_v3.py (FaFaProFree Smart Build Engine)",
+  "file_count": 162,
+  "total_size_bytes": 126135152,
+  "stats": {
+    "downloaded": 20,
+    "reused": 140,
+    "failed": 0,
+    "total_files": 160,
+    "download_bytes": 4596868,
+    "saved_bytes": 121512717,
+    "saved_bandwidth_percent": 96.4
+  }
+}

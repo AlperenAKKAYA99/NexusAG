@@ -1,0 +1,43 @@
+FaFaProFree Third-Party License & Educational Research Notice
+============================================================
+Package  : Font Awesome (Pro-Plus)
+Version  : v7.3.1
+Generated: 2026-09-15 12:58:16 UTC
+Tooling  : user05-ioemlak/FaFaProFree
+
+PART 1: EDUCATIONAL RESEARCH & NON-AFFILIATION NOTICE
+------------------------------------------------------
+This package was compiled using FaFaProFree, an independent open-source
+automation tool developed strictly for educational, technical experimentation,
+and CDN caching research purposes.
+
+1. Intellectual Property & Ownership:
+   "Font Awesome", "Fonticons", and all corresponding logos, icon glyphs,
+   font files (.woff2, .ttf), and vector designs are the proprietary
+   intellectual property and registered trademarks of Fonticons, Inc.
+
+2. Strict Copyright Warning (Telif Hakkı Uyarısı):
+   Font Awesome Pro is commercial software. Using Font Awesome Pro assets in
+   commercial, public, or production web applications WITHOUT an active,
+   officially purchased commercial license from Fonticons, Inc. CONSTITUTES
+   COPYRIGHT INFRINGEMENT and is strictly prohibited by intellectual property laws.
+
+3. No Transfer of Rights:
+   This project does NOT grant, assign, transfer, or sublicense any commercial
+   usage rights to Font Awesome Pro assets.
+
+4. User Responsibility & Official License:
+   All users must obtain and maintain an authorized commercial license directly
+   from Fonticons, Inc. prior to any commercial deployment:
+   https://fontawesome.com/plans
+   https://fontawesome.com/license
+
+
+PART 2: FAFAPROFREE BUILD TOOLING NOTICE (MIT)
+----------------------------------------------
+The build scripts, manifest generator, and automation logic of FaFaProFree
+are licensed under the MIT License:
+
+Copyright (c) 2026 FaFaProFree Contributors
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software tooling without restriction, subject to standard MIT conditions.

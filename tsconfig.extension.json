@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "module": "CommonJS",
+    "target": "ES2022",
+    "outDir": "out",
+    "lib": [
+      "ES2022"
+    ],
+    "sourceMap": true,
+    "rootDir": "src",
+    "strict": true,
+    "composite": true,
+    "declarationDir": "out",
+    "resolveJsonModule": true,
+    "esModuleInterop": true
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/i18n/locales/*.json"
+  ],
+  "exclude": [
+    "node_modules",
+    ".vscode-test",
+    "src/webview/**"
+  ]
+}
