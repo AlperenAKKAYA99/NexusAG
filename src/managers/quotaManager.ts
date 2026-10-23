@@ -19,6 +19,8 @@ import { getUSS } from '../utils/uss';
 import { QuotaViewProvider } from '../providers/quotaViewProvider';
 import { ConversationGuard } from '../services/conversationGuard';
 import { createLogger } from '../utils/logger';
+import { t } from '../i18n';
+import { formatTokens, TokenExportFormat, TokenExportEntry } from '../shared/tokenExportFormatter';
 
 const log = createLogger('QuotaManager');
 
@@ -700,9 +702,11 @@ export class QuotaManager {
         }
     }
 
-    /** Copy refresh_token to clipboard for sharing */
-    async copyToken(accountId: string): Promise<void> {
-        let token = await this.accountManager.getRefreshToken(accountId);
+    /**
+     * Resolves a refresh token for an account id or email with USS and SwitchService fallbacks.
+     */
+    async resolveAccountRefreshToken(accountIdOrEmail: string): Promise<string | null> {
+        let token = await this.accountManager.getRefreshToken(accountIdOrEmail);
 
         // Fallback 1: check active session via USS if this is the active account
         if (!token) {
@@ -725,12 +729,146 @@ export class QuotaManager {
             token = this.switchService.getActiveRefreshToken();
         }
 
+        return token || null;
+    }
+
+    /** Copy refresh_token to clipboard for sharing */
+    async copyToken(accountId: string): Promise<boolean> {
+        const token = await this.resolveAccountRefreshToken(accountId);
+
         if (!token) {
-            vscode.window.showErrorMessage('❌ No token found for this account');
-            return;
+            vscode.window.showErrorMessage(t('notify.noTokenFound'));
+            return false;
         }
         await vscode.env.clipboard.writeText(token);
-        vscode.window.showInformationMessage('🔑 Token copied to clipboard');
+        vscode.window.showInformationMessage(t('notify.tokenCopied'));
+        return true;
+    }
+
+    /**
+     * Copy multiple refresh tokens to clipboard in the specified format.
+     * Webview or caller sends account IDs (or empty for all).
+     */
+    async copyTokens(
+        accountIds?: string[],
+        format: TokenExportFormat = 'plain'
+    ): Promise<{
+        total: number;
+        copiedCount: number;
+        missingCount: number;
+        copiedEmails: string[];
+        missingEmails: string[];
+    }> {
+        const trackedAccounts = this.accountManager.getAccounts();
+
+        // Determine targets: specific accounts or all
+        let targets: Array<{ id: string; email: string; name?: string }>;
+        if (accountIds && accountIds.length > 0) {
+            targets = [];
+            for (const id of accountIds) {
+                const cleanId = id.replace(/^active:/, '').trim().toLowerCase();
+                const matched = trackedAccounts.find(a =>
+                    a.id.toLowerCase() === cleanId ||
+                    (a.email && a.email.toLowerCase() === cleanId)
+                );
+                if (matched) {
+                    targets.push({ id: matched.id, email: matched.email, name: matched.name });
+                } else if (cleanId.includes('@') || cleanId === 'active') {
+                    // Local active account or direct email
+                    const localEmail = this.lastLocalData?.userStatus?.email || (cleanId.includes('@') ? cleanId : 'active');
+                    targets.push({ id, email: localEmail });
+                }
+            }
+        } else {
+            // All tracked accounts + local active account if not already in tracked
+            targets = trackedAccounts.map(a => ({ id: a.id, email: a.email, name: a.name }));
+            const localEmail = this.lastLocalData?.userStatus?.email;
+            if (localEmail && !targets.some(t => t.email.toLowerCase() === localEmail.toLowerCase())) {
+                targets.unshift({ id: 'active', email: localEmail });
+            }
+        }
+
+        if (targets.length === 0) {
+            vscode.window.showWarningMessage(t('export.noneFound'));
+            return { total: 0, copiedCount: 0, missingCount: 0, copiedEmails: [], missingEmails: [] };
+        }
+
+        // Optional confirmation dialog if bulk (more than 1) and confirmBulkCopy is enabled
+        const confirmBulk = vscode.workspace.getConfiguration('ag-switchboard').get<boolean>('tokenExport.confirmBulkCopy', true);
+        if (targets.length > 1 && confirmBulk) {
+            const copyBtn = t('export.copy_other', { count: targets.length });
+            const answer = await vscode.window.showWarningMessage(
+                t('notify.bulkCopyConfirm', { count: targets.length }),
+                { modal: true, detail: t('export.securityWarning') },
+                copyBtn
+            );
+            if (answer !== copyBtn) {
+                return { total: targets.length, copiedCount: 0, missingCount: 0, copiedEmails: [], missingEmails: [] };
+            }
+        }
+
+        const entries: TokenExportEntry[] = [];
+        const copiedEmails: string[] = [];
+        const missingEmails: string[] = [];
+
+        for (const target of targets) {
+            const token = await this.resolveAccountRefreshToken(target.id);
+            if (token) {
+                entries.push({
+                    email: target.email,
+                    name: target.name,
+                    token,
+                });
+                copiedEmails.push(target.email);
+            } else {
+                missingEmails.push(target.email);
+            }
+        }
+
+        if (entries.length === 0) {
+            vscode.window.showErrorMessage(t('export.noneFound'));
+            return {
+                total: targets.length,
+                copiedCount: 0,
+                missingCount: missingEmails.length,
+                copiedEmails: [],
+                missingEmails,
+            };
+        }
+
+        const formatted = formatTokens(entries, format);
+        await vscode.env.clipboard.writeText(formatted);
+
+        // Security auto-clear clipboard timer if configured
+        const clearSeconds = vscode.workspace.getConfiguration('ag-switchboard').get<number>('tokenExport.clearClipboardSeconds', 0);
+        if (clearSeconds > 0) {
+            setTimeout(async () => {
+                try {
+                    const current = await vscode.env.clipboard.readText();
+                    if (current === formatted) {
+                        await vscode.env.clipboard.writeText('');
+                        vscode.window.showInformationMessage(t('notify.clipboardCleared'));
+                    }
+                } catch { /* ignore */ }
+            }, clearSeconds * 1000);
+        }
+
+        // Summary notification
+        if (entries.length === 1 && missingEmails.length === 0) {
+            vscode.window.showInformationMessage(t('notify.tokenCopied'));
+        } else if (missingEmails.length === 0) {
+            vscode.window.showInformationMessage(t('notify.tokensCopied', { count: entries.length }));
+        } else {
+            vscode.window.showWarningMessage(t('export.partial', { copied: entries.length, missing: missingEmails.length }));
+        }
+
+        return {
+            total: targets.length,
+            copiedCount: entries.length,
+            missingCount: missingEmails.length,
+            copiedEmails,
+            missingEmails,
+        };
     }
 
     // ── Workspace Cascade Ownership ────────────────────────────
