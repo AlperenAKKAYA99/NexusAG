@@ -9,6 +9,7 @@ import { renderWorkspaceContext } from './renderers/workspace';
 import { renderUsageStats, renderContextWindow } from './renderers/usage';
 import { updatePricing } from '../shared/usage-components';
 import { onTokensProcessed } from './token-modal';
+import { onTokensCopied } from './token-export-modal';
 import { setTranslations, t } from '../i18n/i18nClient';
 
 const $ = (id: string) => document.getElementById(id);
@@ -109,6 +110,11 @@ export function setupMessageHandler(): void {
 
             case 'tokensProcessed': {
                 onTokensProcessed(msg.result);
+                break;
+            }
+
+            case 'tokensCopied': {
+                onTokensCopied(msg.result);
                 break;
             }
 
