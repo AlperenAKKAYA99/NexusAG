@@ -1,9 +1,9 @@
 # 🔒 Siber Güvenlik, Veri Gizliliği ve Kaynak Kod Denetim Raporu
 
 **Proje Adı:** NexusAG  
-**İncelenen Versiyon:** v1.1.0 (Build b18)  
-**Denetim Tarihi:** 22 Ekim 2026  
-**Önceki Denetim Tarihi:** 13 Ekim 2026 (v3.2.1 — İç Prototip)  
+**İncelenen Versiyon:** v1.1.1 (Build b19)  
+**Denetim Tarihi:** 23 Ekim 2026  
+**Önceki Denetim Tarihi:** 22 Ekim 2026 (v1.1.0)  
 **Denetçi Rolü:** Kıdemli Uygulama Güvenliği Uzmanı, Kötü Amaçlı Yazılım Analisti ve Güvenli Kod Denetçisi  
 **Rapor Durumu:** ✅ Tamamlandı — Nihai Rapor  
 **Rapor Sınıflandırması:** AÇIK — Topluluk Erişimine Uygun  
@@ -380,7 +380,7 @@ const PRICING_URL = `https://raw.githubusercontent.com/BerriAI/litellm/${PRICING
 |---|---|---|---|
 | Google OAuth Client ID | [`oauth.ts:L6`](file:///d:/antygravity/NexusAG-Stabil%20V1.1.0/src/core/constants/oauth.ts#L6) | `1071006060591-*****.apps.googleusercontent.com` | Düşük / Bilgilendirme |
 | Google OAuth Client Secret | [`oauth.ts:L7`](file:///d:/antygravity/NexusAG-Stabil%20V1.1.0/src/core/constants/oauth.ts#L7) | `GOCSPX-****DAf` | Düşük / Bilgilendirme |
-| `.env` Dosyası | [`.env`](file:///d:/antygravity/NexusAG-Stabil%20V1.1.0/.env) | `VERSION=1.1.0`, `BUILD_TAG=b18` | ✅ Temiz (hassas veri yok) |
+| `.env` Dosyası | [`.env`](file:///d:/antygravity/NexusAG-Stabil%20V1.1.0/.env) | `VERSION=1.1.1`, `BUILD_TAG=b18` | ✅ Temiz (hassas veri yok) |
 | Kişisel API Anahtarı | Tüm kod tabanı | *Bulunmadı* | ✅ Temiz |
 | Özel SSH / PGP Anahtarı | Tüm kod tabanı | *Bulunmadı* | ✅ Temiz |
 | Veritabanı Parolası | Tüm kod tabanı | *Bulunmadı* | ✅ Temiz |
@@ -410,7 +410,16 @@ User OAuth → GoogleAuth.exchangeCode() → AccountManager.storeTokens()
 
 **Referans:** [`accountManager.ts:L121-L155`](file:///d:/antygravity/NexusAG-Stabil%20V1.1.0/src/managers/accountManager.ts#L121-L155)
 
-### 8.3. `.gitignore` Analizi
+### 8.3. Çoklu Token Kopyalama (Bulk Export) ve Pano Güvenliği
+
+v1.1.1 sürümüne eklenen çoklu token kopyalama mimarisinde aşağıdaki güvenlik kontrolleri uygulanmıştır:
+
+1. **İzolasyon ve Sıfır Webview Sızıntısı:** Token değerleri asla Webview sürecine gönderilmez. Webview kullanıcı arayüzü yalnızca hesap kimliklerini (`id` / `email`) extension host'a bildirir. Okuma, formatlama ve panoya yazma işlemi tamamen Extension Host tarafında (`vscode.env.clipboard.writeText`) gerçekleşir.
+2. **Kaza Önleyici Onay Modalı:** Birden fazla hesap token'ı kopyalanırken kullanıcıya `ag-switchboard.tokenExport.confirmBulkCopy` ayarı ile açık onay ve güvenlik uyarı diyaloğu sunulur.
+3. **Pano Otomatik Temizleme (Opsiyonel):** Kullanıcı `ag-switchboard.tokenExport.clearClipboardSeconds` ayarını belirlediğinde, pano içeriği değiştirilmemişse N saniye sonra otomatik olarak sıfırlanır.
+4. **Log Maskeleme:** Bellek veya hata raporlarında ham token yerine maskeli gösterim (`1//0eAA...x9Qz`) kullanılır.
+
+### 8.4. `.gitignore` Analizi
 
 `.gitignore` dosyasında `.env` dosyaları, `node_modules/`, `out/`, `dist/`, `*.vsix` ve log dosyaları hariç tutulmuştur. Ancak mevcut `.env` dosyası yalnızca `VERSION` ve `BUILD_TAG` içermekte olup hassas veri barındırmamaktadır.
 
@@ -766,10 +775,11 @@ grep -rn "https\?://" src/ --include="*.ts" | grep -v "127.0.0.1\|localhost\|goo
 | Versiyon | Tarih | Değişiklik | Denetçi |
 |---|---|---|---|
 | v1.0 | 10 Ekim 2026 | İlk denetim raporu (v1.0.0 iç prototip) | Kıdemli AppSec Uzmanı |
-| **v2.0** | **22 Ekim 2026** | **Tam yeniden yazım — v1.1.0 stabil sürümü için kapsamlı denetim. Yeni bölümler: TLS/SSL analizi, webview güvenliği, süreç yönetimi, OWASP uyumluluk matrisi, CI/CD önerileri. Güncellenen dosya referansları, modüler `core/constants/` yapısı, güncel `npm audit` sonuçları.** | Kıdemli AppSec Uzmanı |
+| v2.0 | 22 Ekim 2026 | Tam yeniden yazım — v1.1.0 stabil sürümü için kapsamlı denetim. Yeni bölümler: TLS/SSL analizi, webview güvenliği, süreç yönetimi, OWASP uyumluluk matrisi, CI/CD önerileri. Güncellenen dosya referansları, modüler `core/constants/` yapısı, güncel `npm audit` sonuçları. | Kıdemli AppSec Uzmanı |
+| **v2.1** | **23 Ekim 2026** | **v1.1.1 Çoklu Token Kopyalama (Bulk Export) ve Pano Güvenliği denetimi eklendi (Bölüm 8.3). Pano izolasyonu, Extension Host yetki kısıtı ve SecretStorage koruma kontrolleri onaylandı.** | Kıdemli AppSec Uzmanı |
 
 ---
 
-*Bu rapor, NexusAG v1.1.0 kaynak kodunun kapsamlı bir güvenlik denetimini temsil etmektedir. Rapor, denetim tarihindeki kaynak kod durumuna dayanmaktadır ve gelecekte yapılacak değişiklikler yeni bir denetim gerektirebilir.*
+*Bu rapor, NexusAG v1.1.1 kaynak kodunun kapsamlı bir güvenlik denetimini temsil etmektedir. Rapor, denetim tarihindeki kaynak kod durumuna dayanmaktadır ve gelecekte yapılacak değişiklikler yeni bir denetim gerektirebilir.*
 
 *Rapor Sonu.*
