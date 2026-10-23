@@ -91,7 +91,7 @@ const LOCALES = [
         installText: `1. Suchen Sie im Antigravity Extension Marketplace nach **NexusAG** und klicken Sie auf **Installieren**.
 2. Oder installieren Sie direkt über die \`.vsix\`-Datei:
 \`\`\`bash
-antigravity-ide.cmd --install-extension nexus-ag-1.1.0.vsix --force
+antigravity-ide.cmd --install-extension nexus-ag-1.1.1.vsix --force
 \`\`\``,
         licenseText: 'Veröffentlicht unter der **MIT-Lizenz**. Entwickelt mit ☕ von **[Alperen AKKAYA](https://github.com/AlperenAKKAYA99)**'
     },
@@ -149,7 +149,7 @@ antigravity-ide.cmd --install-extension nexus-ag-1.1.0.vsix --force
         installText: `1. Procure por **NexusAG** no marketplace de extensões do Antigravity e clique em **Instalar**.
 2. Ou instale via arquivo \`.vsix\`:
 \`\`\`bash
-antigravity-ide.cmd --install-extension nexus-ag-1.1.0.vsix --force
+antigravity-ide.cmd --install-extension nexus-ag-1.1.1.vsix --force
 \`\`\``,
         licenseText: 'Distribuído sob a **Licença MIT**. Desenvolvido com ☕ por **[Alperen AKKAYA](https://github.com/AlperenAKKAYA99)**'
     },
@@ -207,7 +207,7 @@ antigravity-ide.cmd --install-extension nexus-ag-1.1.0.vsix --force
         installText: `1. Busque **NexusAG** en el Marketplace de extensiones de Antigravity e instálela.
 2. O instálela mediante el archivo \`.vsix\`:
 \`\`\`bash
-antigravity-ide.cmd --install-extension nexus-ag-1.1.0.vsix --force
+antigravity-ide.cmd --install-extension nexus-ag-1.1.1.vsix --force
 \`\`\``,
         licenseText: 'Distribuido bajo la **Licencia MIT**. Creado con ☕ por **[Alperen AKKAYA](https://github.com/AlperenAKKAYA99)**'
     },
@@ -265,7 +265,7 @@ antigravity-ide.cmd --install-extension nexus-ag-1.1.0.vsix --force
         installText: `1. Recherchez **NexusAG** dans le Marketplace d'extensions Antigravity et cliquez sur **Installer**.
 2. Ou installez directement depuis le fichier \`.vsix\` :
 \`\`\`bash
-antigravity-ide.cmd --install-extension nexus-ag-1.1.0.vsix --force
+antigravity-ide.cmd --install-extension nexus-ag-1.1.1.vsix --force
 \`\`\``,
         licenseText: 'Distribué sous **Licence MIT**. Développé avec ☕ par **[Alperen AKKAYA](https://github.com/AlperenAKKAYA99)**'
     },
@@ -323,7 +323,7 @@ antigravity-ide.cmd --install-extension nexus-ag-1.1.0.vsix --force
         installText: `1. Antigravity 拡張機能マーケットプレイスで **NexusAG** を検索し、**インストール** をクリックします。
 2. または \`.vsix\` ファイルから直接インストールします:
 \`\`\`bash
-antigravity-ide.cmd --install-extension nexus-ag-1.1.0.vsix --force
+antigravity-ide.cmd --install-extension nexus-ag-1.1.1.vsix --force
 \`\`\``,
         licenseText: '**MIT ライセンス**の下で公開されています。Made with ☕ by **[Alperen AKKAYA](https://github.com/AlperenAKKAYA99)**'
     },
@@ -381,7 +381,7 @@ antigravity-ide.cmd --install-extension nexus-ag-1.1.0.vsix --force
         installText: `1. 在 Antigravity 扩展商店搜索 **NexusAG**，点击 **安装**。
 2. 或者直接通过 \`.vsix\` 安装包本地安装:
 \`\`\`bash
-antigravity-ide.cmd --install-extension nexus-ag-1.1.0.vsix --force
+antigravity-ide.cmd --install-extension nexus-ag-1.1.1.vsix --force
 \`\`\``,
         licenseText: '基于 **MIT 许可证** 开源发布。由 **[Alperen AKKAYA](https://github.com/AlperenAKKAYA99)** 倾情打造。'
     },
@@ -435,7 +435,7 @@ antigravity-ide.cmd --install-extension nexus-ag-1.1.0.vsix --force
         installText: `1. Antigravity Extension Marketplace में **NexusAG** खोजें और **Install** पर क्लिक करें।
 2. या सीधे \`.vsix\` फ़ाइल से इंस्टॉल करें:
 \`\`\`bash
-antigravity-ide.cmd --install-extension nexus-ag-1.1.0.vsix --force
+antigravity-ide.cmd --install-extension nexus-ag-1.1.1.vsix --force
 \`\`\``,
         licenseText: '**MIT लाइसेंस** के तहत वितरित। **[Alperen AKKAYA](https://github.com/AlperenAKKAYA99)** द्वारा ☕ के साथ विकसित।'
     },
@@ -493,7 +493,7 @@ antigravity-ide.cmd --install-extension nexus-ag-1.1.0.vsix --force
         installText: `1. Найдите **NexusAG** в Marketplace расширений Antigravity и нажмите **Установить**.
 2. Или установите напрямую из файла \`.vsix\`:
 \`\`\`bash
-antigravity-ide.cmd --install-extension nexus-ag-1.1.0.vsix --force
+antigravity-ide.cmd --install-extension nexus-ag-1.1.1.vsix --force
 \`\`\``,
         licenseText: 'Распространяется под **лицензией MIT**. Создано с ☕ автором **[Alperen AKKAYA](https://github.com/AlperenAKKAYA99)**'
     }
@@ -647,7 +647,7 @@ function buildReadmeContent(loc, isSubdir = false) {
 </p>
 
 <p align="center">
-  <a href="https://github.com/AlperenAKKAYA99/NexusAG/releases"><img alt="${loc.versionBadge}" src="https://img.shields.io/badge/${loc.versionBadge}-1.1.0-blue.svg?style=for-the-badge&logo=visualstudiocode"/></a>
+  <a href="https://github.com/AlperenAKKAYA99/NexusAG/releases"><img alt="${loc.versionBadge}" src="https://img.shields.io/badge/${loc.versionBadge}-1.1.1-blue.svg?style=for-the-badge&logo=visualstudiocode"/></a>
   <img alt="Platform" src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-6366f1.svg?style=for-the-badge&logo=apple"/>
   <img alt="License" src="https://img.shields.io/badge/license-MIT-10b981.svg?style=for-the-badge"/>
   <img alt="${loc.langBadge}" src="https://img.shields.io/badge/${loc.langBadge}-ec4899.svg?style=for-the-badge&logo=google-translate"/>
@@ -877,7 +877,8 @@ Contributions, bug reports, and feature suggestions are warmly welcomed!
 
 For the full release history, see [CHANGELOG.md](CHANGELOG.md).
 
-- **v1.1.0 (Current)** — 10-language instant reactive localization, multi-banner asset generation, enhanced UI showcase, and unified branding.
+- **v1.1.1 (Current)** — Bulk token export & copy system with smart round-trip extraction, clipboard auto-clearing timer, and enhanced multi-account security.
+- **v1.1.0** — 10-language instant reactive localization, multi-banner asset generation, enhanced UI showcase, and unified branding.
 - **v1.0.5** — Usage Stats deduplication via \`responseId\`, dynamic model auto-humanization, and quota 100% bugfix.
 - **v1.0.4** — **Conversation Guard**, standalone detached repair worker, and pure-TypeScript Protobuf trajectory codec for orphaned conversation recovery.
 - **v1.0.3** — Multi-window state isolation, USS event gating, and background polling resilience.
