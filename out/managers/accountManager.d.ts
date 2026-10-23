@@ -46,6 +46,17 @@ export declare class AccountManager {
     /** Get refresh token for an account (for clipboard copy / sharing) */
     getRefreshToken(accountIdOrEmail: string): Promise<string | null>;
     /**
+     * Get refresh tokens for multiple accounts in bulk.
+     * Parallel lookup without network calls (reads from OS SecretStorage).
+     */
+    getRefreshTokensBulk(idsOrEmails: string[]): Promise<Array<{
+        id: string;
+        email?: string;
+        name?: string;
+        token: string | null;
+        error?: string;
+    }>>;
+    /**
      * Create or update an account with fresh tokens.
      * Shared by addAccount (OAuth flow) and addAccountByToken (paste flow).
      */
