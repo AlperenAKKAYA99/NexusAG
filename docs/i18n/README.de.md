@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/AlperenAKKAYA99/NexusAG/releases"><img alt="Version" src="https://img.shields.io/badge/Version-1.1.0-blue.svg?style=for-the-badge&logo=visualstudiocode"/></a>
+  <a href="https://github.com/AlperenAKKAYA99/NexusAG/releases"><img alt="Version" src="https://img.shields.io/badge/Version-1.1.1-blue.svg?style=for-the-badge&logo=visualstudiocode"/></a>
   <img alt="Platform" src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-6366f1.svg?style=for-the-badge&logo=apple"/>
   <img alt="License" src="https://img.shields.io/badge/license-MIT-10b981.svg?style=for-the-badge"/>
   <img alt="Sprachen-10%20nativ" src="https://img.shields.io/badge/Sprachen-10%20nativ-ec4899.svg?style=for-the-badge&logo=google-translate"/>
@@ -179,7 +179,7 @@ graph TB
 1. Suchen Sie im Antigravity Extension Marketplace nach **NexusAG** und klicken Sie auf **Installieren**.
 2. Oder installieren Sie direkt über die `.vsix`-Datei:
 ```bash
-antigravity-ide.cmd --install-extension nexus-ag-1.1.0.vsix --force
+antigravity-ide.cmd --install-extension nexus-ag-1.1.1.vsix --force
 ```
 
 ---
@@ -273,7 +273,8 @@ Contributions, bug reports, and feature suggestions are warmly welcomed!
 
 For the full release history, see [CHANGELOG.md](CHANGELOG.md).
 
-- **v1.1.0 (Current)** — 10-language instant reactive localization, multi-banner asset generation, enhanced UI showcase, and unified branding.
+- **v1.1.1 (Current)** — Bulk token export & copy system with smart round-trip extraction, clipboard auto-clearing timer, and enhanced multi-account security.
+- **v1.1.0** — 10-language instant reactive localization, multi-banner asset generation, enhanced UI showcase, and unified branding.
 - **v1.0.5** — Usage Stats deduplication via `responseId`, dynamic model auto-humanization, and quota 100% bugfix.
 - **v1.0.4** — **Conversation Guard**, standalone detached repair worker, and pure-TypeScript Protobuf trajectory codec for orphaned conversation recovery.
 - **v1.0.3** — Multi-window state isolation, USS event gating, and background polling resilience.
