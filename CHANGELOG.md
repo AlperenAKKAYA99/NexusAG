@@ -2,6 +2,14 @@
 
 All notable changes to **NexusAG** are documented here.
 
+## [1.1.1] — 2026-10-23
+
+### Added
+- **Bulk Token Export (Copy Tokens)** — Export and copy multiple account OAuth refresh tokens to clipboard with one click in Plain (1 per line), Labeled (`# email`), or JSON format, with full round-trip compatibility in "Add via Token" modal.
+- **Enhanced Token Extraction & Security** — Smart comment stripping, Google token signature regex extraction, optional clipboard auto-clearing timer (`clearClipboardSeconds`), and confirmation modal dialog for bulk operations.
+- **Dedicated Command Palette Integration** — `ag.copyTokens` command with multi-select QuickPick and format selection.
+- **10 Native Locales for Export UI** — 22 new localization keys with 100% parity across EN, TR, DE, ES, FR, HI, JA, PT-BR, RU, and ZH-CN.
+
 ## [1.1.0] — 2026-10-21
 
 ### Added
