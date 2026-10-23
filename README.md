@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/AlperenAKKAYA99/NexusAG/releases"><img alt="Version" src="https://img.shields.io/badge/version-1.1.0-blue.svg?style=for-the-badge&logo=visualstudiocode"/></a>
+  <a href="https://github.com/AlperenAKKAYA99/NexusAG/releases"><img alt="Version" src="https://img.shields.io/badge/version-1.1.1-blue.svg?style=for-the-badge&logo=visualstudiocode"/></a>
   <img alt="Platform" src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-6366f1.svg?style=for-the-badge&logo=apple"/>
   <img alt="License" src="https://img.shields.io/badge/license-MIT-10b981.svg?style=for-the-badge"/>
   <img alt="Languages" src="https://img.shields.io/badge/languages-10%20native%20locales-ec4899.svg?style=for-the-badge&logo=google-translate"/>
@@ -224,13 +224,13 @@ graph TB
 #### Method 2: Manual VSIX Installation
 Download the latest `.vsix` release from the [GitHub Releases](https://github.com/AlperenAKKAYA99/NexusAG/releases) tab and install via terminal:
 ```bash
-antigravity-ide.cmd --install-extension nexus-ag-1.1.0.vsix --force
+antigravity-ide.cmd --install-extension nexus-ag-1.1.1.vsix --force
 ```
 
 ### 🎯 First Steps After Installation
 1. Click the **NexusAG** icon on your Activity Bar.
 2. Your primary active account will load automatically.
-3. Click `+` to add secondary accounts via Google browser login.
+3. Click `+` to add secondary accounts via Google browser login or `🔑` to import refresh tokens.
 4. Star (★) your primary model to pin its quota percentage directly onto your status bar.
 5. Click **"Open Full Dashboard →"** in the Usage tab to explore your lifetime AI analytics.
 
@@ -245,6 +245,7 @@ All core features can be triggered from the VS Code Command Palette (`Ctrl+Shift
 | **NexusAG: Refresh Quota** | `ag.refreshQuota` | Forces an immediate quota and token budget refresh from Google APIs. |
 | **NexusAG: Add Account** | `ag.addAccount` | Opens browser window for 1-click Google OAuth authentication. |
 | **NexusAG: Add Account via Token** | `ag.addAccountByToken` | Opens modal for batch importing OAuth refresh tokens. |
+| **NexusAG: Copy Account Tokens** | `ag.copyTokens` | Opens multi-select picker to export refresh tokens in Plain, Labeled, or JSON format. |
 | **NexusAG: Remove Account** | `ag.removeAccount` | Removes a selected account from local storage and tracking. |
 | **NexusAG: Open Usage Statistics** | `ag.openUsageStats` | Launches the full-editor deep analytics bento dashboard. |
 | **NexusAG: Fix Missing Conversations** | `ag.fixConversations` | Scans disk storage and repairs unindexed `.pb` conversations. |
@@ -261,6 +262,9 @@ Configure NexusAG under **Settings** (`Ctrl+,` or `Cmd+,`) → Search `NexusAG`:
 | `ag-switchboard.refreshInterval` | `string` | `1m` | Background polling frequency for quota updates (`instant`, `30s`, `1m`, `2m`, `5m`). |
 | `ag-switchboard.modelPricing` | `object` | Defaults | Custom per-model rates per 1M tokens (`input`, `output`, `cache`). |
 | `ag-switchboard.switchWithFixConversations` | `boolean` | `true` | Automatically synchronizes and repairs the conversation index on account switch. |
+| `ag-switchboard.tokenExport.defaultFormat` | `string` | `plain` | Default export format when copying multiple tokens (`plain`, `labeled`, `json`). |
+| `ag-switchboard.tokenExport.clearClipboardSeconds` | `number` | `0` | Automatically clear tokens from clipboard after N seconds (0 = disabled). |
+| `ag-switchboard.tokenExport.confirmBulkCopy` | `boolean` | `true` | Show confirmation security dialog before copying multiple tokens. |
 | `ag-switchboard.diagnosticMode` | `boolean` | `false` | Enables verbose diagnostic file logging for troubleshooting. |
 
 ---
@@ -271,11 +275,11 @@ Configure NexusAG under **Settings** (`Ctrl+,` or `Cmd+,`) → Search `NexusAG`:
 
 | Metric | Specification |
 |---|---|
-| **Total Source Modules** | 60 TypeScript + 2 CSS files |
-| **Codebase Volume** | ~19,200+ Lines of Code |
+| **Total Source Modules** | 62 TypeScript + 2 CSS files |
+| **Codebase Volume** | ~19,600+ Lines of Code |
 | **Runtime Dependencies** | **0** (Zero external dependencies) |
 | **Build System** | esbuild (Sub-second webview bundling) |
-| **Supported Locales** | 10 Native Languages (251 keys each, 100% parity) |
+| **Supported Locales** | 10 Native Languages (273 keys each, 100% parity) |
 | **Security Audit** | Passed — 0 critical / high findings |
 | **Supported Platforms** | macOS (Apple Silicon / Intel), Windows 10/11, Linux (x64/arm64) |
 
@@ -369,7 +373,8 @@ Contributions, bug reports, and feature suggestions are warmly welcomed!
 
 For the full release history, see [CHANGELOG.md](CHANGELOG.md).
 
-- **v1.1.0 (Current)** — 10-language instant reactive localization, multi-banner asset generation, enhanced UI showcase, and unified branding.
+- **v1.1.1 (Current)** — Bulk token export & copy system with smart round-trip extraction, clipboard auto-clearing timer, and enhanced multi-account security.
+- **v1.1.0** — 10-language instant reactive localization, multi-banner asset generation, enhanced UI showcase, and unified branding.
 - **v1.0.5** — Usage Stats deduplication via `responseId`, dynamic model auto-humanization, and quota 100% bugfix.
 - **v1.0.4** — **Conversation Guard**, standalone detached repair worker, and pure-TypeScript Protobuf trajectory codec for orphaned conversation recovery.
 - **v1.0.3** — Multi-window state isolation, USS event gating, and background polling resilience.
