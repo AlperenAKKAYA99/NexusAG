@@ -19,6 +19,10 @@ import { setUsageTranslator } from '../shared/usage-components';
 import { renderAll } from './renderers/accounts';
 import { renderUsageStats } from './renderers/usage';
 import { initTokenModal, openTokenModal, closeTokenModal, submitTokens } from './token-modal';
+import {
+    initTokenExportModal, openTokenExportModal, closeTokenExportModal,
+    submitTokenExport, selectExportAccounts, setExportFormat
+} from './token-export-modal';
 
 interface SavedState { intervalMs?: number | string; activeTab?: string }
 
@@ -110,6 +114,7 @@ applyStaticTranslations();
 renderLanguageGrid();
 setupMessageHandler();
 initTokenModal();
+initTokenExportModal();
 
 wlog('BEFORE_READY_POST');
 vscode.postMessage({ type: 'ready' });
@@ -131,6 +136,13 @@ const ACTIONS: Record<string, (t: HTMLElement) => void> = {
     'open-token-modal':     () => openTokenModal(),
     'close-token-modal':    () => closeTokenModal(),
     'submit-tokens':        () => submitTokens(),
+    'open-token-export':    () => openTokenExportModal(),
+    'close-token-export':   () => closeTokenExportModal(),
+    'submit-token-export':  () => submitTokenExport(),
+    'export-select-all':    () => selectExportAccounts('all'),
+    'export-select-none':   () => selectExportAccounts('none'),
+    'export-select-healthy':() => selectExportAccounts('healthy'),
+    'set-export-format':    t => setExportFormat((t.dataset.format as any) || 'plain'),
     'refresh-token-only':   () => doRefreshTokenOnly(),
     'refresh-usage-only':   () => doRefreshUsage(),
     'set-interval':         t => pickInterval(t),
