@@ -45,6 +45,10 @@ export function copyToken(id: string): void {
     vscode.postMessage({ type: 'copyToken', accountId: id });
 }
 
+export function copyTokens(accountIds?: string[], format = 'plain'): void {
+    vscode.postMessage({ type: 'copyTokens', accountIds, format });
+}
+
 export function toggleModel(modelId: string, isVisible: boolean): void {
     vscode.postMessage({ type: 'toggleModel', modelId, isVisible });
 }
