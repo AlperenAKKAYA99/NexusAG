@@ -3,7 +3,7 @@
   "displayName": "NexusAG",
   "description": "Switch between Antigravity accounts instantly. Monitor AI quotas, token budgets and reset timers — all in one sidebar panel.",
   "icon": "assets/icons/icon.png",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "publisher": "AlperenAKKAYA99",
   "license": "MIT",
   "repository": {
@@ -78,6 +78,11 @@
         "command": "ag.openUsageStats",
         "title": "NexusAG: Open Usage Statistics",
         "icon": "$(graph)"
+      },
+      {
+        "command": "ag.copyTokens",
+        "title": "NexusAG: Copy Account Tokens",
+        "icon": "$(copy)"
       },
       {
         "command": "ag.fixConversations",
@@ -180,6 +185,31 @@
           "type": "boolean",
           "default": true,
           "description": "Automatically run Fix Missing Conversations and relaunch Antigravity when switching accounts to keep conversation index intact."
+        },
+        "ag-switchboard.tokenExport.defaultFormat": {
+          "type": "string",
+          "default": "plain",
+          "enum": [
+            "plain",
+            "labeled",
+            "json"
+          ],
+          "enumDescriptions": [
+            "Plain list of tokens, one per line",
+            "Labeled with account emails as comments",
+            "Structured JSON array of account objects"
+          ],
+          "description": "Default formatting style when copying multiple account tokens."
+        },
+        "ag-switchboard.tokenExport.clearClipboardSeconds": {
+          "type": "number",
+          "default": 0,
+          "description": "Automatically clear tokens from the clipboard after N seconds for enhanced security (0 disables auto-clearing)."
+        },
+        "ag-switchboard.tokenExport.confirmBulkCopy": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show confirmation modal warning before copying multiple account tokens to the clipboard."
         }
       }
     }
