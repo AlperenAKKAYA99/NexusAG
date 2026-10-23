@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/AlperenAKKAYA99/NexusAG/releases"><img alt="Sürüm" src="https://img.shields.io/badge/s%C3%BCr%C3%BCm-1.1.0-blue.svg?style=for-the-badge&logo=visualstudiocode"/></a>
+  <a href="https://github.com/AlperenAKKAYA99/NexusAG/releases"><img alt="Sürüm" src="https://img.shields.io/badge/s%C3%BCr%C3%BCm-1.1.1-blue.svg?style=for-the-badge&logo=visualstudiocode"/></a>
   <img alt="Platform" src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-6366f1.svg?style=for-the-badge&logo=apple"/>
   <img alt="Lisans" src="https://img.shields.io/badge/lisans-MIT-10b981.svg?style=for-the-badge"/>
   <img alt="Diller" src="https://img.shields.io/badge/dil%20deste%C4%9Fi-10%20yerel%20dil-ec4899.svg?style=for-the-badge&logo=google-translate"/>
@@ -224,13 +224,13 @@ graph TB
 #### 2. Yöntem: Manuel VSIX Kurulumu
 En güncel `.vsix` paketini [GitHub Releases](https://github.com/AlperenAKKAYA99/NexusAG/releases) sayfasından indirin ve terminalden kurun:
 ```bash
-antigravity-ide.cmd --install-extension nexus-ag-1.1.0.vsix --force
+antigravity-ide.cmd --install-extension nexus-ag-1.1.1.vsix --force
 ```
 
 ### 🎯 Kurulum Sonrası İlk Adımlar
 1. Etkinlik Çubuğundaki **NexusAG** simgesine tıklayın.
 2. Birincil hesabınız otomatik olarak yüklenecektir.
-3. İkincil Google hesaplarınızı eklemek için `+` butonuna tıklayın.
+3. İkincil Google hesaplarınızı eklemek için `+` butonuna tıklayın veya `🔑` ile token içe/dışa aktarın.
 4. Modelin kota yüzdesini durum çubuğunuza sabitlemek için yanındaki yıldız (★) simgesine tıklayın.
 5. Kullanım sekmesindeki **"Tam Panoyu Aç →"** butonuna basarak tüm geçmiş yapay zeka istatistiklerinizi inceleyin.
 
@@ -245,6 +245,7 @@ Tüm temel özellikler VS Code Komut Paleti üzerinden tetiklenebilir (`Ctrl+Shi
 | **NexusAG: Refresh Quota** | `ag.refreshQuota` | Google API'lerinden en güncel kota ve token bütçesini anında yeniler. |
 | **NexusAG: Add Account** | `ag.addAccount` | Tek tıkla tarayıcı üzerinden Google OAuth girişini başlatır. |
 | **NexusAG: Add Account via Token** | `ag.addAccountByToken` | Toplu OAuth yenileme tokenı yapıştırma penceresini açar. |
+| **NexusAG: Copy Account Tokens** | `ag.copyTokens` | Çoklu token kopyalama ve Düz/Etiketli/JSON formatlarında dışa aktarma penceresini açar. |
 | **NexusAG: Remove Account** | `ag.removeAccount` | Seçilen hesabı yerel depolamadan ve takipten kaldırır. |
 | **NexusAG: Open Usage Statistics** | `ag.openUsageStats` | Tam editör bento kullanım analitiği panosunu açar. |
 | **NexusAG: Fix Missing Conversations** | `ag.fixConversations` | Diski tarayarak indekste yer almayan `.pb` konuşmalarını onarır. |
@@ -261,6 +262,9 @@ Ayarlar (`Ctrl+,` / `Cmd+,`) → `NexusAG` araması yaparak yapılandırabilirsi
 | `ag-switchboard.refreshInterval` | `string` | `1m` | Arka plan kota yenileme periyodu (`instant`, `30s`, `1m`, `2m`, `5m`). |
 | `ag-switchboard.modelPricing` | `object` | Varsayılanlar | 1M token başına model maliyet oranları (`input`, `output`, `cache`). |
 | `ag-switchboard.switchWithFixConversations` | `boolean` | `true` | Hesap değiştirildiğinde konuşma indeksini otomatik senkronize edip onarır. |
+| `ag-switchboard.tokenExport.defaultFormat` | `string` | `plain` | Çoklu token kopyalamada varsayılan format (`plain`, `labeled`, `json`). |
+| `ag-switchboard.tokenExport.clearClipboardSeconds` | `number` | `0` | Güvenlik amacıyla token'ları N saniye sonra panodan otomatik temizler (0 = kapalı). |
+| `ag-switchboard.tokenExport.confirmBulkCopy` | `boolean` | `true` | Çoklu token kopyalama öncesi onay ve güvenlik uyarısı gösterir. |
 | `ag-switchboard.diagnosticMode` | `boolean` | `false` | Sorun giderme amacıyla ayrıntılı dosya günlüğü kaydını açar. |
 
 ---
@@ -271,11 +275,11 @@ Ayarlar (`Ctrl+,` / `Cmd+,`) → `NexusAG` araması yaparak yapılandırabilirsi
 
 | Metrik | Değer |
 |---|---|
-| **Toplam Kaynak Modülü** | 60 TypeScript + 2 CSS dosyası |
-| **Kod Tabanı Hacmi** | ~19.200+ Satır Kod |
+| **Toplam Kaynak Modülü** | 62 TypeScript + 2 CSS dosyası |
+| **Kod Tabanı Hacmi** | ~19.600+ Satır Kod |
 | **Çalışma Zamanı Bağımlılığı** | **0** (Sıfır harici bağımlılık) |
 | **Derleme Sistemi** | esbuild (Saniye altı webview paketleme) |
-| **Desteklenen Diller** | 10 Yerel Dil (Dil başına 251 anahtar, %100 kapsama) |
+| **Desteklenen Diller** | 10 Yerel Dil (Dil başına 273 anahtar, %100 kapsama) |
 | **Güvenlik Denetimi** | Onaylandı — 0 kritik / yüksek seviyeli bulgu |
 | **Desteklenen Platformlar** | macOS (Apple Silicon / Intel), Windows 10/11, Linux (x64/arm64) |
 
@@ -369,7 +373,8 @@ Katkılar, hata bildirimleri ve özellik önerileri memnuniyetle karşılanır!
 
 Tüm sürüm geçmişi için [CHANGELOG.md](CHANGELOG.md) dosyasına göz atabilirsiniz.
 
-- **v1.1.0 (Güncel)** — 10 dilde anlık reaktif yerelleştirme (10 native locales), dinamik çok dilli promosyon banner üretimi, yenilenen arayüz galerisi ve tam kimlik birleşimi.
+- **v1.1.1 (Güncel)** — Çoklu token kopyalama (Bulk Token Export) ve akıllı çift yönlü ayrıştırma, otomatik pano temizleme ve güvenlik kontrolleri.
+- **v1.1.0** — 10 dilde anlık reaktif yerelleştirme (10 native locales), dinamik çok dilli promosyon banner üretimi, yenilenen arayüz galerisi ve tam kimlik birleşimi.
 - **v1.0.5** — `responseId` ile kullanım istatistikleri tekrarlarının önlenmesi, model listesinin dinamik hale getirilmesi ve kota %100 hesaplama düzeltmesi.
 - **v1.0.4** — **Conversation Guard**, bağımsız arka plan onarım çalışanı ve saf TypeScript Protobuf kod çözücüsü ile kayıp konuşmaları diskten kurtarma.
 - **v1.0.3** — Çoklu pencere (cross-window) durum yalıtımı, USS olay geçidi ve arka plan yoklama dayanıklılığı.
