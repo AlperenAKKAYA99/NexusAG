@@ -18,4 +18,5 @@ Object.defineProperty(exports, "__esModule", { value: true });
  * Re-exporting from src/lib for backward compatibility.
  */
 __exportStar(require("../lib"), exports);
+__exportStar(require("./tokenExportFormatter"), exports);
 //# sourceMappingURL=index.js.map
