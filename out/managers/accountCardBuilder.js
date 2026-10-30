@@ -7,6 +7,35 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.buildAccountCards = buildAccountCards;
 const helpers_1 = require("../shared/helpers");
 const lsTypes_1 = require("../utils/lsTypes");
+const constants_1 = require("../constants");
+/**
+ * Compute lowest quota percentage for each of the 3 primary model families:
+ * 1. Claude family (Sonnet / Opus)
+ * 2. Argon / GPT-OSS family (Advanced reasoning / open-source)
+ * 3. Gemini family (Flash / Pro)
+ */
+function computeFamilyStatus(models) {
+    let claudeMin = null;
+    let argonGptMin = null;
+    let geminiMin = null;
+    for (const m of models) {
+        const norm = (0, helpers_1.normalizeModelKey)(m.label || m.id);
+        if (norm.includes('claude')) {
+            claudeMin = claudeMin === null ? m.pct : Math.min(claudeMin, m.pct);
+        }
+        else if (norm.includes('argon') || norm.includes('gpt') || norm.includes('oss')) {
+            argonGptMin = argonGptMin === null ? m.pct : Math.min(argonGptMin, m.pct);
+        }
+        else if (norm.includes('gemini')) {
+            geminiMin = geminiMin === null ? m.pct : Math.min(geminiMin, m.pct);
+        }
+    }
+    return {
+        claudePct: claudeMin,
+        argonGptPct: argonGptMin,
+        geminiPct: geminiMin,
+    };
+}
 /**
  * Build a normKey → LS label lookup map from local protobuf data.
  * This is the "Rosetta Stone" that bridges LS enum IDs and API keys
@@ -50,7 +79,7 @@ function resolveLabel(apiKey, labelMap) {
     // 3. No match → fallback to shortModelName (existing behavior)
     return (0, helpers_1.shortModelName)(apiKey);
 }
-function buildAccountCards(localData, trackedQuotas, activeEmailRaw, switchActive, selectedModels) {
+function buildAccountCards(localData, trackedQuotas, activeEmailRaw, switchActive, selectedModels, customLabels) {
     const activeEmail = (activeEmailRaw || '').toLowerCase();
     const cards = [];
     // Build label map from local LS data (Rosetta Stone for cross-source pin matching)
@@ -60,8 +89,17 @@ function buildAccountCards(localData, trackedQuotas, activeEmailRaw, switchActiv
     // When no switch is actively in-flight, the local Hub/LS email is authoritative
     const effectiveActiveEmail = (!switchActive && localEmail) ? localEmail : activeEmail;
     if (status) {
+        // Filter out unavailable, disabled, or empty quota models (e.g. Gemini 4 Argon)
         const rawModels = (status.cascadeModelConfigData?.clientModelConfigs || [])
-            .filter((m) => m.quotaInfo)
+            .filter((m) => {
+            if (m.disabled === true)
+                return false;
+            if (m.tagTitle === 'Unavailable')
+                return false;
+            if (!m.quotaInfo || m.quotaInfo.remainingFraction === undefined)
+                return false;
+            return true;
+        })
             .sort((a, b) => (a.label || '').localeCompare(b.label || ''));
         const models = rawModels.map((m) => ({
             id: m.modelOrAlias?.model || m.label,
@@ -73,6 +111,7 @@ function buildAccountCards(localData, trackedQuotas, activeEmailRaw, switchActiv
             isLocal: true,
         }));
         const bottleneckModel = models.length > 0 ? models.reduce((a, b) => a.pct < b.pct ? a : b) : null;
+        const familyStatus = computeFamilyStatus(models);
         const userTier = (0, lsTypes_1.parseUserTier)(status.userTier);
         const planStatus = (0, lsTypes_1.parsePlanStatus)(status.planStatus);
         const aiCredits = userTier.availableCredits.find(c => c.creditType === 'GOOGLE_ONE_AI');
@@ -82,9 +121,14 @@ function buildAccountCards(localData, trackedQuotas, activeEmailRaw, switchActiv
             switchActive);
         // Match local active account with tracked accounts to enable copyToken and removeAccount
         const matchingTracked = trackedQuotas.find(t => (t.account.email || '').toLowerCase() === localEmail);
+        const localCustomLabel = customLabels
+            ? (customLabels[localEmail] || (status.email ? customLabels[status.email.toLowerCase()] : undefined))
+            : undefined;
         cards.push({
             email: status.email || 'active-local',
             name: matchingTracked?.account.name,
+            customLabel: localCustomLabel,
+            familyStatus,
             isActive: !effectiveActiveEmail || effectiveActiveEmail === localEmail,
             isTransitioning,
             pendingEmail: isTransitioning ? activeEmailRaw : undefined,
@@ -111,7 +155,18 @@ function buildAccountCards(localData, trackedQuotas, activeEmailRaw, switchActiv
         const trackedEmail = (trackedQuota.account.email || '').toLowerCase();
         if (dedupEmail && trackedEmail === dedupEmail)
             continue;
-        const models = (trackedQuota.models || []).map(m => ({
+        // Filter out internal test/routing buckets and non-IDE obsolete models
+        const validTracked = (trackedQuota.models || []).filter(m => {
+            const id = (m.name || '').toLowerCase();
+            if (constants_1.CHAT_INTERNAL_RE.test(id))
+                return false;
+            if (id.endsWith('-image') || id.includes('-image-'))
+                return false;
+            if (id.startsWith('gemini-2.5') || id.startsWith('gemini-2-'))
+                return false;
+            return true;
+        });
+        const models = validTracked.map(m => ({
             id: m.name,
             label: resolveLabel(m.name, labelMap),
             pct: m.percentage || 0,
@@ -119,9 +174,13 @@ function buildAccountCards(localData, trackedQuotas, activeEmailRaw, switchActiv
             isLocal: false,
         }));
         const bottleneckModel = models.length > 0 ? models.reduce((a, b) => a.pct < b.pct ? a : b) : null;
+        const familyStatus = computeFamilyStatus(models);
+        const trackedCustomLabel = (customLabels && customLabels[trackedEmail]) || trackedQuota.account.customLabel;
         cards.push({
             email: trackedQuota.account.email || 'Unknown',
             name: trackedQuota.account.name,
+            customLabel: trackedCustomLabel,
+            familyStatus,
             isActive: !!(effectiveActiveEmail && effectiveActiveEmail === trackedEmail),
             trackingId: trackedQuota.account.id,
             models,

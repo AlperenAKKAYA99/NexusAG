@@ -146,6 +146,28 @@ class QuotaViewProvider {
                 case 'copyToken':
                     this.quotaManager.copyToken(msg.accountId);
                     break;
+                case 'editAccountLabel': {
+                    const email = msg.email;
+                    if (!email)
+                        break;
+                    const currentLabel = this.accountManager.getAccountLabel(email) || '';
+                    const newLabel = await vscode.window.showInputBox({
+                        title: (0, i18n_1.t)('accounts.setLabelTitle'),
+                        prompt: (0, i18n_1.t)('accounts.setLabelPrompt'),
+                        value: currentLabel,
+                        placeHolder: (0, i18n_1.t)('accounts.setLabelPlaceholder'),
+                        validateInput: (val) => {
+                            if (val.trim().length > 40)
+                                return 'Label is too long (max 40 characters)';
+                            return null;
+                        },
+                    });
+                    if (newLabel !== undefined) {
+                        await this.accountManager.setAccountLabel(email, newLabel.trim());
+                        this.quotaManager.pushCachedData();
+                    }
+                    break;
+                }
                 case 'openUsagePanel':
                     vscode.commands.executeCommand('ag.openUsageStats');
                     break;

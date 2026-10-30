@@ -109,6 +109,15 @@ class QuotaApiService {
             if (!modelId)
                 continue;
             const cleanId = modelId.split('/').pop();
+            // 1. Filter out Google Cloud Pa internal test/routing buckets (e.g. Chat_20706, Chat_23310)
+            if (constants_1.CHAT_INTERNAL_RE.test(cleanId) || constants_1.CHAT_INTERNAL_RE.test(modelId))
+                continue;
+            // 2. Filter out non-interactive image/embedding buckets (e.g. gemini-3.1-flash-image)
+            if (cleanId.endsWith('-image') || cleanId.includes('-image-'))
+                continue;
+            // 3. Filter out obsolete model generations not offered in modern Antigravity IDE (e.g. gemini-2.5-*)
+            if (cleanId.startsWith('gemini-2.5') || cleanId.startsWith('gemini-2-'))
+                continue;
             const displayName = constants_1.MODEL_DISPLAY_NAMES[cleanId]
                 || constants_1.MODEL_DISPLAY_NAMES[modelId]
                 || QuotaApiService.humanizeModelId(cleanId);

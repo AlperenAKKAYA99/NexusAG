@@ -146,6 +146,38 @@ export async function activate(context: vscode.ExtensionContext) {
             }
         }),
 
+        vscode.commands.registerCommand('ag.setAccountLabel', async (email?: string) => {
+            let targetEmail = email;
+            if (!targetEmail) {
+                const accounts = accountManager.getAccounts();
+                const activeEmail = await quotaManager.getActiveEmail();
+                const items = accounts.map(a => ({
+                    label: a.customLabel ? `${a.customLabel} (${a.email})` : a.email,
+                    email: a.email,
+                }));
+                if (activeEmail && !items.some(i => i.email.toLowerCase() === activeEmail.toLowerCase())) {
+                    items.unshift({ label: `${activeEmail} [Active]`, email: activeEmail });
+                }
+                const picked = await vscode.window.showQuickPick(items, {
+                    placeHolder: t('accounts.selectToEditLabel'),
+                });
+                if (!picked) return;
+                targetEmail = picked.email;
+            }
+
+            const current = accountManager.getAccountLabel(targetEmail) || '';
+            const newLabel = await vscode.window.showInputBox({
+                title: t('accounts.setLabelTitle'),
+                prompt: t('accounts.setLabelPrompt'),
+                value: current,
+                placeHolder: t('accounts.setLabelPlaceholder'),
+            });
+            if (newLabel !== undefined) {
+                await accountManager.setAccountLabel(targetEmail, newLabel.trim());
+                quotaManager.pushCachedData();
+            }
+        }),
+
         vscode.commands.registerCommand('ag.addAccountByToken', async () => {
             const success = await accountManager.addAccountByToken();
             if (success) {

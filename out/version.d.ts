@@ -1,2 +1,2 @@
-export declare const EXTENSION_VERSION = "1.3.3";
-export declare const BUILD_TAG = "b23";
+export declare const EXTENSION_VERSION = "1.3.4";
+export declare const BUILD_TAG = "b25";

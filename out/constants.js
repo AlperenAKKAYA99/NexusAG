@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CSRF_TOKEN_RE = exports.LS_PROCESS_GREP_LEGACY = exports.LS_PROCESS_GREP = exports.LS_CERT_PATHS = exports.STATE_DB_PATH = exports.isWindows = exports.isLinux = exports.isMac = exports.LS_SERVICE_PATH = exports.HOURS_IN_DAY = exports.CASCADE_ENRICHED_TITLE_MAX_LEN = exports.CASCADE_ENRICHED_LIMIT = exports.CASCADE_TITLE_MAX_LEN = exports.CASCADE_LIST_LIMIT = exports.USAGE_MEDIUM_PCT = exports.USAGE_HIGH_PCT = exports.QUOTA_WARN_PCT = exports.QUOTA_HEALTHY_PCT = exports.CTX_CRITICAL_PCT = exports.CTX_WARNING_PCT = exports.FILE_HEADER_READ_BYTES = exports.RENEWAL_RETRY_DELAY_MS = exports.CASCADE_PROBE_TIMEOUT_MS = exports.LSOF_EXEC_TIMEOUT_MS = exports.WMIC_EXEC_TIMEOUT_MS = exports.PROCESS_EXEC_TIMEOUT_MS = exports.DEFAULT_LS_TIMEOUT_MS = exports.LS_REQUEST_TIMEOUT_MS = exports.OAUTH_CALLBACK_TIMEOUT_MS = exports.TOKEN_REFRESH_BUFFER_SECS = exports.POLL_INTERVAL_MS = exports.USER_AGENT = exports.ACCOUNTS_LIST_KEY = exports.SECRETS_PREFIX = exports.MODEL_DISPLAY_NAMES = exports.LOAD_CODE_ASSIST_ENDPOINTS = exports.QUOTA_API_ENDPOINTS = exports.OAUTH_SCOPES = exports.USERINFO_URL = exports.AUTH_URL = exports.TOKEN_URL = exports.CLIENT_SECRET = exports.CLIENT_ID = void 0;
+exports.CSRF_TOKEN_RE = exports.LS_PROCESS_GREP_LEGACY = exports.LS_PROCESS_GREP = exports.LS_CERT_PATHS = exports.STATE_DB_PATH = exports.isWindows = exports.isLinux = exports.isMac = exports.LS_SERVICE_PATH = exports.HOURS_IN_DAY = exports.CASCADE_ENRICHED_TITLE_MAX_LEN = exports.CASCADE_ENRICHED_LIMIT = exports.CASCADE_TITLE_MAX_LEN = exports.CASCADE_LIST_LIMIT = exports.USAGE_MEDIUM_PCT = exports.USAGE_HIGH_PCT = exports.QUOTA_WARN_PCT = exports.QUOTA_HEALTHY_PCT = exports.CTX_CRITICAL_PCT = exports.CTX_WARNING_PCT = exports.FILE_HEADER_READ_BYTES = exports.RENEWAL_RETRY_DELAY_MS = exports.CASCADE_PROBE_TIMEOUT_MS = exports.LSOF_EXEC_TIMEOUT_MS = exports.WMIC_EXEC_TIMEOUT_MS = exports.PROCESS_EXEC_TIMEOUT_MS = exports.DEFAULT_LS_TIMEOUT_MS = exports.LS_REQUEST_TIMEOUT_MS = exports.OAUTH_CALLBACK_TIMEOUT_MS = exports.TOKEN_REFRESH_BUFFER_SECS = exports.POLL_INTERVAL_MS = exports.USER_AGENT = exports.CHAT_INTERNAL_RE = exports.ACCOUNT_LABELS_KEY = exports.ACCOUNTS_LIST_KEY = exports.SECRETS_PREFIX = exports.MODEL_DISPLAY_NAMES = exports.LOAD_CODE_ASSIST_ENDPOINTS = exports.QUOTA_API_ENDPOINTS = exports.OAUTH_SCOPES = exports.USERINFO_URL = exports.AUTH_URL = exports.TOKEN_URL = exports.CLIENT_SECRET = exports.CLIENT_ID = void 0;
 exports.isDiagEnabled = isDiagEnabled;
 // ─── OAuth Client Credentials (SUSP-04 / Informational) ───────────────
 // Antigravity's public desktop OAuth client credentials (RFC 8252 — OAuth 2.0 for Native Apps).
@@ -78,6 +78,9 @@ exports.MODEL_DISPLAY_NAMES = {
 // Secrets storage key prefix
 exports.SECRETS_PREFIX = 'ag.account.';
 exports.ACCOUNTS_LIST_KEY = 'ag.trackedAccounts';
+exports.ACCOUNT_LABELS_KEY = 'ag.accountLabels';
+/** Regex to filter out Google Cloud Pa internal test/routing buckets (e.g. Chat_20706, Chat_23310) */
+exports.CHAT_INTERNAL_RE = /^chat[_-]?\d+/i;
 // User-Agent for API requests
 exports.USER_AGENT = 'Antigravity/4.1.29 Chrome/132.0.6834.160 Electron/39.2.3';
 /** Minimum UI refresh polling interval */

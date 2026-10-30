@@ -147,7 +147,7 @@ class QuotaManager {
         };
     }
     getAccountCards() {
-        const cards = (0, accountCardBuilder_1.buildAccountCards)(this.lastLocalData, this.lastTrackedQuotas, this.lastActiveEmail, !!this.switchController, this.getSelectedModels());
+        const cards = (0, accountCardBuilder_1.buildAccountCards)(this.lastLocalData, this.lastTrackedQuotas, this.lastActiveEmail, !!this.switchController, this.getSelectedModels(), this.accountManager.getAllAccountLabels());
         return cards;
     }
     getSelectedModels() {

@@ -5,8 +5,10 @@
  * Used by: webview/renderers/usage.ts (sidebar) & providers/usageStatsPanel.ts (detail panel)
  */
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.MONTH_KEYS = void 0;
 exports.setUsageTranslator = setUsageTranslator;
 exports.tu = tu;
+exports.fmtShortDateI18n = fmtShortDateI18n;
 exports.usageTotal = usageTotal;
 exports.kpiCard = kpiCard;
 exports.renderDailyBars = renderDailyBars;
@@ -40,6 +42,22 @@ function setUsageTranslator(fn) {
 function tu(key, params) {
     return activeTranslator(key, params);
 }
+exports.MONTH_KEYS = [
+    'dashboard.months.jan', 'dashboard.months.feb', 'dashboard.months.mar',
+    'dashboard.months.apr', 'dashboard.months.may', 'dashboard.months.jun',
+    'dashboard.months.jul', 'dashboard.months.aug', 'dashboard.months.sep',
+    'dashboard.months.oct', 'dashboard.months.nov', 'dashboard.months.dec',
+];
+/** Format short date using localized month name from tu() (e.g. 11 Eki / 11 Oct) */
+function fmtShortDateI18n(iso) {
+    if (!iso || iso.length < 10)
+        return iso;
+    const parts = iso.split('-');
+    const m = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    const mName = (m >= 0 && m < 12) ? tu(exports.MONTH_KEYS[m]) : parts[1];
+    return `${day} ${mName}`;
+}
 /** All token telemetry for a bucket/model/month. */
 function usageTotal(u) {
     return u.input + u.output + (u.cache || 0) + (u.cacheWrite || 0) + (u.reasoning || 0);
@@ -71,12 +89,12 @@ function renderDailyBars(daily, costPerToken = 0) {
         const caPct = total > 0 ? (d.cache / total * barW) : 0;
         const ouPct = total > 0 ? (d.output / total * barW) : 0;
         const rePct = total > 0 ? ((d.reasoning || 0) / total * barW) : 0;
-        let tipText = (0, helpers_1.fmtShortDate)(d.date) + '&#10;' + tu('dashboard.costInput') + ': ' + (0, helpers_1.fmtBig)(d.input) + '&#10;' + tu('dashboard.costCache') + ': ' + (0, helpers_1.fmtBig)(d.cache) + '&#10;' + tu('dashboard.costOutput') + ': ' + (0, helpers_1.fmtBig)(d.output) + '&#10;' + tu('dashboard.costTotal') + ': ' + (0, helpers_1.fmtBig)(total) + ' (' + (0, helpers_1.fmtNum)(d.calls) + ' ' + tu('common.calls') + ')';
+        let tipText = fmtShortDateI18n(d.date) + '&#10;' + tu('dashboard.costInput') + ': ' + (0, helpers_1.fmtBig)(d.input) + '&#10;' + tu('dashboard.costCache') + ': ' + (0, helpers_1.fmtBig)(d.cache) + '&#10;' + tu('dashboard.costOutput') + ': ' + (0, helpers_1.fmtBig)(d.output) + '&#10;' + tu('dashboard.costTotal') + ': ' + (0, helpers_1.fmtBig)(total) + ' (' + (0, helpers_1.fmtNum)(d.calls) + ' ' + tu('common.calls') + ')';
         if (costPerToken > 0) {
             tipText += '&#10;' + tu('usage.estCost') + ': ' + fmtDollar(total * costPerToken);
         }
         html += '<div class="deep-daily-row" data-tip="' + tipText + '">';
-        html += '<span class="deep-daily-date">' + (0, helpers_1.fmtShortDate)(d.date) + '</span>';
+        html += '<span class="deep-daily-date">' + fmtShortDateI18n(d.date) + '</span>';
         html += '<div class="deep-daily-bar">';
         if (inPct > 0)
             html += '<div class="usage-bar-seg usage-c-input" style="width:' + inPct.toFixed(1) + '%"></div>';
@@ -133,12 +151,6 @@ function renderHourlyHeatmap(hourly, costPerToken = 0) {
 //  GitHub-style Daily Contribution Grid
 // ═══════════════════════════════════════════
 const DAY_KEYS = ['dashboard.days.mon', '', 'dashboard.days.wed', '', 'dashboard.days.fri', '', ''];
-const MONTH_KEYS = [
-    'dashboard.months.jan', 'dashboard.months.feb', 'dashboard.months.mar',
-    'dashboard.months.apr', 'dashboard.months.may', 'dashboard.months.jun',
-    'dashboard.months.jul', 'dashboard.months.aug', 'dashboard.months.sep',
-    'dashboard.months.oct', 'dashboard.months.nov', 'dashboard.months.dec',
-];
 /**
  * @param large — if true, uses gh-grid-lg class for bigger cells (detail panel)
  * @param year — which year to render (defaults to current year)
@@ -190,16 +202,28 @@ function renderDailyGrid(daily, large = false, year, costPerToken = 0) {
     }
     if (currentWeek.length > 0)
         weeks.push(currentWeek);
-    // Month labels
+    // Month labels (skip previous year's padding week, enforce >= 2 weeks between labels to prevent collision)
     const lgCls = large ? ' gh-grid-lg' : '';
     let html = '<div class="gh-grid-wrap' + lgCls + '">';
     html += '<div class="gh-month-row"><span class="gh-day-label"></span>';
     let lastMonth = -1;
-    for (const week of weeks) {
-        const m = new Date(week[0].date + 'T00:00:00').getMonth();
-        html += '<span class="gh-month-label">' + (m !== lastMonth ? tu(MONTH_KEYS[m]) : '') + '</span>';
-        if (m !== lastMonth)
+    let weeksSinceLastMonth = 99;
+    for (let wIdx = 0; wIdx < weeks.length; wIdx++) {
+        const week = weeks[wIdx];
+        const inYearDay = week.find(c => c.date.startsWith(String(selectedYear))) || week[0];
+        const d = new Date(inYearDay.date + 'T00:00:00');
+        const m = d.getMonth();
+        const y = d.getFullYear();
+        let label = '';
+        if (y === selectedYear && m !== lastMonth && weeksSinceLastMonth >= 2) {
+            label = tu(exports.MONTH_KEYS[m]);
             lastMonth = m;
+            weeksSinceLastMonth = 0;
+        }
+        else {
+            weeksSinceLastMonth++;
+        }
+        html += '<span class="gh-month-label">' + label + '</span>';
     }
     html += '</div>';
     // Grid
@@ -217,8 +241,8 @@ function renderDailyGrid(daily, large = false, year, costPerToken = 0) {
                         : (cell.total / maxTokens) < 0.35 ? 2
                             : (cell.total / maxTokens) < 0.65 ? 3 : 4;
             const costStr = (costPerToken > 0 && cell.total > 0) ? '&#10;~' + fmtDollar(cell.total * costPerToken) : '';
-            const title = cell.future ? (0, helpers_1.fmtShortDate)(cell.date)
-                : (0, helpers_1.fmtShortDate)(cell.date) + '&#10;' + (cell.total > 0 ? (0, helpers_1.fmtBig)(cell.total) + ' ' + tu('common.tokens') + '&#10;' + (0, helpers_1.fmtNum)(cell.calls) + ' ' + tu('common.calls') + costStr : tu('dashboard.noActivity'));
+            const title = cell.future ? fmtShortDateI18n(cell.date)
+                : fmtShortDateI18n(cell.date) + '&#10;' + (cell.total > 0 ? (0, helpers_1.fmtBig)(cell.total) + ' ' + tu('common.tokens') + '&#10;' + (0, helpers_1.fmtNum)(cell.calls) + ' ' + tu('common.calls') + costStr : tu('dashboard.noActivity'));
             html += '<div class="gh-cell gh-lvl-' + level + '" data-tip="' + title + '"></div>';
         }
         html += '</div>';
@@ -228,7 +252,7 @@ function renderDailyGrid(daily, large = false, year, costPerToken = 0) {
     html += '<div class="gh-footer">';
     html += '<span class="gh-legend">' + tu('dashboard.less') + ' <span class="gh-cell gh-lvl-0 gh-sm"></span><span class="gh-cell gh-lvl-1 gh-sm"></span><span class="gh-cell gh-lvl-2 gh-sm"></span><span class="gh-cell gh-lvl-3 gh-sm"></span><span class="gh-cell gh-lvl-4 gh-sm"></span> ' + tu('dashboard.moreLegend') + '</span>';
     if (peakDay.total > 0) {
-        html += '<span class="gh-peak">' + tu('dashboard.peak') + ' <strong>' + (0, helpers_1.fmtShortDate)(peakDay.date) + '</strong> (' + (0, helpers_1.fmtBig)(peakDay.total) + ')</span>';
+        html += '<span class="gh-peak">' + tu('dashboard.peak') + ' <strong>' + fmtShortDateI18n(peakDay.date) + '</strong> (' + (0, helpers_1.fmtBig)(peakDay.total) + ')</span>';
     }
     html += '</div>';
     html += '</div>';
@@ -777,7 +801,9 @@ function renderRangeBar(activeRange, cssPrefix = 'deep') {
     let html = `<div class="${cssPrefix}-range-bar" id="usageRangeBar">`;
     for (const r of RANGES) {
         const active = activeRange === r.id ? ' active' : '';
-        const label = r.id === 'all' ? tu('dashboard.allTime') : r.label;
+        const label = r.id === 'all'
+            ? (tu('dashboard.ranges.allTime') || tu('dashboard.allTime') || 'All Time')
+            : r.label;
         html += `<button class="${cssPrefix}-range-btn${active}" data-action="set-usage-range" data-range="${r.id}">${label}</button>`;
     }
     html += '</div>';

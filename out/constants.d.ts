@@ -9,6 +9,9 @@ export declare const LOAD_CODE_ASSIST_ENDPOINTS: string[];
 export declare const MODEL_DISPLAY_NAMES: Record<string, string>;
 export declare const SECRETS_PREFIX = "ag.account.";
 export declare const ACCOUNTS_LIST_KEY = "ag.trackedAccounts";
+export declare const ACCOUNT_LABELS_KEY = "ag.accountLabels";
+/** Regex to filter out Google Cloud Pa internal test/routing buckets (e.g. Chat_20706, Chat_23310) */
+export declare const CHAT_INTERNAL_RE: RegExp;
 export declare const USER_AGENT = "Antigravity/4.1.29 Chrome/132.0.6834.160 Electron/39.2.3";
 /** Minimum UI refresh polling interval */
 export declare const POLL_INTERVAL_MS: number;

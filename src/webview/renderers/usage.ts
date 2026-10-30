@@ -118,7 +118,11 @@ function renderCompactDashboard(el: HTMLElement, stats: any): void {
         dataEl = el.querySelector('.deep-data-wrap');
     }
 
-    // Update active state on range buttons without replacing DOM
+    // Update active state and labels on range buttons without replacing DOM
+    const allBtn = rangeBarEl?.querySelector('[data-range="all"]') as HTMLElement | null;
+    if (allBtn) {
+        allBtn.textContent = t('dashboard.ranges.allTime') || t('dashboard.allTime') || 'All Time';
+    }
     rangeBarEl?.querySelectorAll('.deep-range-btn').forEach(b => {
         b.classList.toggle('active', (b as HTMLElement).dataset.range === state);
     });

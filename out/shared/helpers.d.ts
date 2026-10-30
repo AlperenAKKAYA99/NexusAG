@@ -23,8 +23,8 @@ export declare function shortTierName(name: string | undefined | null): string;
 export declare function fmtNum(n: number): string;
 /** Large number → compact string (1.2M, 489.7K) */
 export declare function fmtBig(n: number): string;
-/** ISO date → short display (Apr 19) */
-export declare function fmtShortDate(iso: string): string;
+/** ISO date → short display (Apr 19 or 19 Eki) */
+export declare function fmtShortDate(iso: string, localizedMonths?: string[]): string;
 /** HTML entity escape (escapes &, <, >, \", and ') */
 export declare function escHtml(s: string): string;
 /** CSP nonce generator */

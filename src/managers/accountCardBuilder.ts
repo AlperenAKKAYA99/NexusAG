@@ -3,9 +3,39 @@
  * No state, no side effects, easily testable. Renderer does zero logic.
  */
 
-import { AccountQuota, AccountCard, ModelCard, LocalQuotaData } from '../types';
+import { AccountQuota, AccountCard, ModelCard, LocalQuotaData, ModelFamilyStatus } from '../types';
 import { shortModelName, normalizeModelKey } from '../shared/helpers';
 import { parseUserTier, parsePlanStatus } from '../utils/lsTypes';
+import { CHAT_INTERNAL_RE } from '../constants';
+
+/**
+ * Compute lowest quota percentage for each of the 3 primary model families:
+ * 1. Claude family (Sonnet / Opus)
+ * 2. Argon / GPT-OSS family (Advanced reasoning / open-source)
+ * 3. Gemini family (Flash / Pro)
+ */
+function computeFamilyStatus(models: ModelCard[]): ModelFamilyStatus {
+    let claudeMin: number | null = null;
+    let argonGptMin: number | null = null;
+    let geminiMin: number | null = null;
+
+    for (const m of models) {
+        const norm = normalizeModelKey(m.label || m.id);
+        if (norm.includes('claude')) {
+            claudeMin = claudeMin === null ? m.pct : Math.min(claudeMin, m.pct);
+        } else if (norm.includes('argon') || norm.includes('gpt') || norm.includes('oss')) {
+            argonGptMin = argonGptMin === null ? m.pct : Math.min(argonGptMin, m.pct);
+        } else if (norm.includes('gemini')) {
+            geminiMin = geminiMin === null ? m.pct : Math.min(geminiMin, m.pct);
+        }
+    }
+
+    return {
+        claudePct: claudeMin,
+        argonGptPct: argonGptMin,
+        geminiPct: geminiMin,
+    };
+}
 
 /**
  * Build a normKey → LS label lookup map from local protobuf data.
@@ -59,6 +89,7 @@ export function buildAccountCards(
     activeEmailRaw: string,
     switchActive: boolean,
     selectedModels: string[],
+    customLabels?: Record<string, string>,
 ): AccountCard[] {
     const activeEmail = (activeEmailRaw || '').toLowerCase();
     const cards: AccountCard[] = [];
@@ -72,8 +103,14 @@ export function buildAccountCards(
     const effectiveActiveEmail = (!switchActive && localEmail) ? localEmail : activeEmail;
 
     if (status) {
+        // Filter out unavailable, disabled, or empty quota models (e.g. Gemini 4 Argon)
         const rawModels = (status.cascadeModelConfigData?.clientModelConfigs || [])
-            .filter((m: any) => m.quotaInfo)
+            .filter((m: any) => {
+                if (m.disabled === true) return false;
+                if (m.tagTitle === 'Unavailable') return false;
+                if (!m.quotaInfo || m.quotaInfo.remainingFraction === undefined) return false;
+                return true;
+            })
             .sort((a: any, b: any) => (a.label || '').localeCompare(b.label || ''));
 
         const models: ModelCard[] = rawModels.map((m: any) => ({
@@ -87,6 +124,7 @@ export function buildAccountCards(
         }));
 
         const bottleneckModel = models.length > 0 ? models.reduce((a, b) => a.pct < b.pct ? a : b) : null;
+        const familyStatus = computeFamilyStatus(models);
         const userTier = parseUserTier(status.userTier);
         const planStatus = parsePlanStatus(status.planStatus);
         const aiCredits = userTier.availableCredits.find(c => c.creditType === 'GOOGLE_ONE_AI');
@@ -103,9 +141,15 @@ export function buildAccountCards(
             t => (t.account.email || '').toLowerCase() === localEmail
         );
 
+        const localCustomLabel = customLabels
+            ? (customLabels[localEmail] || (status.email ? customLabels[status.email.toLowerCase()] : undefined))
+            : undefined;
+
         cards.push({
             email: status.email || 'active-local',
             name: matchingTracked?.account.name,
+            customLabel: localCustomLabel,
+            familyStatus,
             isActive: !effectiveActiveEmail || effectiveActiveEmail === localEmail,
             isTransitioning,
             pendingEmail: isTransitioning ? activeEmailRaw : undefined,
@@ -134,7 +178,16 @@ export function buildAccountCards(
         const trackedEmail = (trackedQuota.account.email || '').toLowerCase();
         if (dedupEmail && trackedEmail === dedupEmail) continue;
 
-        const models: ModelCard[] = (trackedQuota.models || []).map(m => ({
+        // Filter out internal test/routing buckets and non-IDE obsolete models
+        const validTracked = (trackedQuota.models || []).filter(m => {
+            const id = (m.name || '').toLowerCase();
+            if (CHAT_INTERNAL_RE.test(id)) return false;
+            if (id.endsWith('-image') || id.includes('-image-')) return false;
+            if (id.startsWith('gemini-2.5') || id.startsWith('gemini-2-')) return false;
+            return true;
+        });
+
+        const models: ModelCard[] = validTracked.map(m => ({
             id: m.name,
             label: resolveLabel(m.name, labelMap),
             pct: m.percentage || 0,
@@ -143,10 +196,14 @@ export function buildAccountCards(
         }));
 
         const bottleneckModel = models.length > 0 ? models.reduce((a, b) => a.pct < b.pct ? a : b) : null;
+        const familyStatus = computeFamilyStatus(models);
+        const trackedCustomLabel = (customLabels && customLabels[trackedEmail]) || trackedQuota.account.customLabel;
 
         cards.push({
             email: trackedQuota.account.email || 'Unknown',
             name: trackedQuota.account.name,
+            customLabel: trackedCustomLabel,
+            familyStatus,
             isActive: !!(effectiveActiveEmail && effectiveActiveEmail === trackedEmail),
             trackingId: trackedQuota.account.id,
             models,

@@ -47,6 +47,10 @@ export const MODEL_DISPLAY_NAMES: Record<string, string> = {
 // Secrets storage key prefix
 export const SECRETS_PREFIX = 'ag.account.';
 export const ACCOUNTS_LIST_KEY = 'ag.trackedAccounts';
+export const ACCOUNT_LABELS_KEY = 'ag.accountLabels';
+
+/** Regex to filter out Google Cloud Pa internal test/routing buckets (e.g. Chat_20706, Chat_23310) */
+export const CHAT_INTERNAL_RE = /^chat[_-]?\d+/i;
 
 // User-Agent for API requests
 export const USER_AGENT = 'Antigravity/4.1.29 Chrome/132.0.6834.160 Electron/39.2.3';

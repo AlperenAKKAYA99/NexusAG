@@ -5,6 +5,7 @@ export interface TrackedAccount {
     id: string;
     email: string;
     name: string;
+    customLabel?: string;
     addedAt: number;
 }
 
@@ -64,6 +65,13 @@ export interface ModelCard {
     isLocal: boolean;
 }
 
+/** 3-family status for multi-dot status matrix */
+export interface ModelFamilyStatus {
+    claudePct: number | null;
+    argonGptPct: number | null;
+    geminiPct: number | null;
+}
+
 /**
  * Pre-processed account card — renderer does ZERO logic.
  * Built by quotaManager.buildAccountCards(), consumed by webview renderAll().
@@ -71,6 +79,8 @@ export interface ModelCard {
 export interface AccountCard {
     email: string;
     name?: string;
+    customLabel?: string;
+    familyStatus?: ModelFamilyStatus;
     isActive: boolean;
     trackingId?: string;        // only for tracked accounts (switch/copy/remove)
     models: ModelCard[];
@@ -174,6 +184,10 @@ export interface ClientModelConfig {
     label?: string;
     modelOrAlias?: { model?: string };
     quotaInfo?: ModelQuotaInfo;
+    disabled?: boolean;
+    tagTitle?: string;
+    tagDescription?: string;
+    modelId?: string;
 }
 
 /** Local LS GetUserStatus response shape */

@@ -89,13 +89,18 @@ function fmtBig(n) {
         return (n / 1_000).toFixed(1) + 'K';
     return String(n);
 }
-/** ISO date → short display (Apr 19) */
-function fmtShortDate(iso) {
+/** ISO date → short display (Apr 19 or 19 Eki) */
+function fmtShortDate(iso, localizedMonths) {
     if (!iso || iso.length < 10)
         return iso;
     const parts = iso.split('-');
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return months[parseInt(parts[1], 10) - 1] + ' ' + parseInt(parts[2], 10);
+    const mIdx = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    const months = localizedMonths && localizedMonths.length === 12
+        ? localizedMonths
+        : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = months[mIdx] || parts[1];
+    return localizedMonths ? `${day} ${month}` : `${month} ${day}`;
 }
 // ─── HTML/Security helpers ───
 /** HTML entity escape (escapes &, <, >, \", and ') */

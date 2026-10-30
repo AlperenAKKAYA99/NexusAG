@@ -1,4 +1,4 @@
-﻿<p align="center">
+<p align="center">
   <a href="readme.md">English</a> •
   <a href="README.tr.md"><b>Türkçe</b></a> •
   <a href="README.pt-BR.md">Português</a> •
@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/AlperenAKKAYA99/NexusAG/releases"><img alt="Sürüm" src="https://img.shields.io/badge/s%C3%BCr%C3%BCm-1.3.3%20(b23)-blue.svg?style=for-the-badge&logo=visualstudiocode"/></a>
+  <a href="https://github.com/AlperenAKKAYA99/NexusAG/releases"><img alt="Sürüm" src="https://img.shields.io/badge/s%C3%BCr%C3%BCm-1.3.4%20(b25)-blue.svg?style=for-the-badge&logo=visualstudiocode"/></a>
   <img alt="Platform" src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-6366f1.svg?style=for-the-badge&logo=apple"/>
   <img alt="Lisans" src="https://img.shields.io/badge/lisans-MIT-10b981.svg?style=for-the-badge"/>
   <img alt="Diller" src="https://img.shields.io/badge/dil%20deste%C4%9Fi-10%20yerel%20dil-ec4899.svg?style=for-the-badge&logo=google-translate"/>
@@ -38,7 +38,7 @@
 
 ## ⚡ 60 Saniyede Başlayın
 
-1. **Yükleyin** — Antigravity Eklenti Mağazası'nda `NexusAG` arayın veya `nexus-ag-1.3.3.vsix` paketini kurun.
+1. **Yükleyin** — Antigravity Eklenti Mağazası'nda `NexusAG` arayın veya `nexus-ag-1.3.4.vsix` paketini kurun.
 2. **Hesap Ekleyin** — Kenar çubuğundaki `+` butonuna tıklayarak Google ile oturum açın veya `🔑` ile token yapıştırın.
 3. **İzleyin & Değiştirin** — Canlı kota göstergeleriniz, sıfırlanma sayaçlarınız, aktif bağlam penceresi metrikleriniz ve kullanım analitiğiniz anında devrede!
 
@@ -91,7 +91,7 @@
 
 ## 🆕 Antigravity 2.27+ Yeni Nesil Uyumluluk Mimarisi
 
-Google Antigravity 2.27.0 sürümüyle birlikte eski `language_server_win.exe` ikilisi kaldırılarak yerine birleşik **`agy.exe --hub`** mimarisine geçilmiştir. NexusAG v1.3.3, bu modernizasyon için özel olarak geliştirilmiş modüler bir altyapı sunar:
+Google Antigravity 2.27.0 sürümüyle birlikte eski `language_server_win.exe` ikilisi kaldırılarak yerine birleşik **`agy.exe --hub`** mimarisine geçilmiştir. NexusAG v1.3.4, bu modernizasyon için özel olarak geliştirilmiş modüler bir altyapı sunar:
 
 ```mermaid
 flowchart TD
@@ -113,11 +113,13 @@ flowchart TD
 ```
 
 ### 1. Faz 0 Doğrudan Eklenti Kancası ve Sıfır-Netstat Keşfi
+
 - **Doğrudan Kanca (`getAgyExtensionEndpoint`):** Süreç listeleme maliyetini tamamen ortadan kaldırarak aktif pencerenin `port` ve `csrfToken` değerlerini doğrudan `google.google-antigravity` eklentisinin export'larından okur.
 - **`--hub-port` Doğrudan Ayrıştırma:** Port doğrudan argüman regex'i ile alınır; yavaş `netstat` ve `lsof` taramalarına gerek kalmaz.
 - **Çoklu Pencere İzolasyonu (`--add-dir`):** Her IDE penceresi kendi `agy --hub` sürecini başlatır. NexusAG, `--add-dir` değerini aktif çalışma alanı yoluyla (`pathsEqual`) karşılaştırarak pencereler arası yanlış hesap değişimini kesin olarak önler.
 
 ### 2. Sıfır Tarayıcı Açılışıyla Doğrudan Hesap Geçişi (`AgyHubBackend`)
+
 - **İşletim Sistemi Anahtarlık Enjeksiyonu:** OAuth kimlik bilgilerini doğrudan işletim sistemi kasasına yazar:
   - **Windows:** P/Invoke `advapi32.dll CredWriteW` ile Base64 komut üzerinden `gemini:antigravity` hedefine yazım.
   - **macOS:** Yerel `security add-generic-password` ile Keychain'e yazım.
@@ -126,35 +128,40 @@ flowchart TD
 - **Yedek Doğal Akış:** Tokenlar eksikse veya doğrudan geçiş teyit edilemezse, eklenti otomatik olarak `antigravity.internal.loginWithRedirect` üzerinden yönlendirmeli oturum açmaya geçer.
 
 ### 3. Modern SQLite Konuşma Depolama Desteği (`isAgyHubStorage`)
+
 - `~/.gemini/antigravity/` altındaki `conversation_summaries.db` SQLite veritabanını ve `.done` geçiş işaretlerini otomatik tespit eder.
 - Eski `.pb` Protobuf diff mekanizmasını güvenle atlayarak asılsız "kayıp konuşma" uyarılarını engeller.
 
 ### 4. %100 Geriye Dönük Uyumluluk (`LegacyUssBackend`)
+
 - Antigravity 2.27 öncesi eski sürümler (`language_server_*`, UnifiedStateSync ve `RegisterGdmUser`) için tam destek korunmaktadır.
 
 ---
 
 ## 🔄 Evrim ve Eski Sürümlerden Bu Yana Neler Değişti?
 
-| Özellik / Alt Sistem | Eski Sürümler (v1.0 - v1.1) | Ara Sürüm (v1.2) | Güncel NexusAG (v1.3.3 b23) |
-|---|---|---|---|
-| **Antigravity Motoru** | Yalnızca 2.27 öncesi (`language_server_*`) | Kısmi `agy` tespiti | **Doğal Çift Mimari (`AgyHubBackend` + `LegacyUssBackend`)** |
-| **Hesap Değişimi** | Sürekli tarayıcı pop-up girişi | Tarayıcı yönlendirmeli geçiş | **Sıfır Tarayıcı Açılışı: OS Keyring P/Invoke ile Doğrudan Geçiş** |
-| **Port Keşfi** | Ağır `netstat -ano` / `lsof` taraması | Kısmi bayrak eşleşmesi | **Faz 0 Eklenti Kancası + Doğrudan `--hub-port` ayrıştırma** |
-| **Pencere İzolasyonu** | `--workspace_id` (2.27'de kırık) | Basit dize karşılaştırması | **Katı `--add-dir` ayrıştırması ve Windows harf duyarsız yol denetimi** |
-| **Konuşma Deposu** | Sabit `.pb` Protobuf taraması | Sabit `.pb` taraması | **`conversation_summaries.db` & `.done` SQLite geçiş tespiti** |
-| **Güvenlik ve İzolasyon** | Temel HTML kaçışı | Temel HTML kaçışı | **Güçlendirilmiş `escHtml` (`&quot;`, `&#39;`), Nonce CSP, Parametrik `execFile` & `stdin`** |
-| **Model Fiyat Listesi** | Sabit oranlar | LiteLLM değişken `main` dalı | **LiteLLM Değişmez Commit (`5338edb7...`) + Gemini 3.8 Flash & Claude 4.6 Thinking** |
-| **Font Varlıkları** | Dış CDN yazı tipi çağrıları | Yerel font dosyaları | **Font Awesome Pro 7.3.1 gömülü Base64 (sıfır harici istek)** |
-| **Yerelleştirme** | İngilizce & Türkçe kısmi | 10 dilde eksik anahtarlar | **10 Yerel Dil, 251/251 anahtar ile %100 doğrulanmış çeviri paritesi** |
-| **VSIX Paket Boyutu** | ~8.71 MB (optimize edilmemiş) | ~8.71 MB | **6.91 MB optimize paket (~1.8 MB hafifletme, sıfır `node_modules`)** |
+| Özellik / Alt Sistem           | Eski Sürüm (v1.0 - v1.1)                   | Ara Sürüm (v1.2)                | Güncel NexusAG (v1.3.4 b24)                                                                         |
+| ------------------------------ | ------------------------------------------ | ------------------------------- | --------------------------------------------------------------------------------------------------- |
+| **Antigravity Motoru**         | Yalnızca 2.27 öncesi (`language_server_*`) | Kısmi `agy` tespiti             | **Doğal Çift Mimari (`AgyHubBackend` + `LegacyUssBackend`)**                                        |
+| **Hesap Değişimi**             | Sürekli tarayıcı pop-up girişi             | Tarayıcı yönlendirmeli geçiş    | **Sıfır Tarayıcı Açılışı: OS Keyring P/Invoke ile Doğrudan Geçiş**                                  |
+| **Özel İsimlendirme & Sağlık** | Ham e-posta & tek durum noktası            | Ham e-posta & tek durum noktası | **Özel Etiketler (`İş Hesabı #1`), 3'lü Mikro Nokta (`Claude/Argon/Gemini`), Sahte Alarm Filtresi** |
+| **Port Keşfi**                 | Ağır `netstat -ano` / `lsof` taraması      | Kısmi bayrak eşleşmesi          | **Faz 0 Eklenti Kancası + Doğrudan `--hub-port` ayrıştırma**                                        |
+| **Pencere İzolasyonu**         | `--workspace_id` (2.27'de kırık)           | Basit dize karşılaştırması      | **Katı `--add-dir` ayrıştırması ve Windows harf duyarsız yol denetimi**                             |
+| **Konuşma Deposu**             | Sabit `.pb` Protobuf taraması              | Sabit `.pb` taraması            | **`conversation_summaries.db` & `.done` SQLite geçiş tespiti**                                      |
+| **Güvenlik ve İzolasyon**      | Temel HTML kaçışı                          | Temel HTML kaçışı               | **Güçlendirilmiş `escHtml` (`&quot;`, `&#39;`), Nonce CSP, Parametrik `execFile` & `stdin`**        |
+| **Model Fiyat Listesi**        | Sabit oranlar                              | LiteLLM değişken `main` dalı    | **LiteLLM Değişmez Commit (`5338edb7...`) + Gemini 3.8 Flash & Claude 4.6 Thinking**                |
+| **Font Varlıkları**            | Dış CDN yazı tipi çağrıları                | Yerel font dosyaları            | **Font Awesome Pro 7.3.1 gömülü Base64 (sıfır harici istek)**                                       |
+| **Yerelleştirme**              | İngilizce & Türkçe kısmi                   | 10 dilde eksik anahtarlar       | **10 Yerel Dil, 257/257 anahtar ile %100 doğrulanmış çeviri paritesi**                              |
+| **VSIX Paket Boyutu**          | ~8.71 MB (optimize edilmemiş)              | ~8.71 MB                        | **6.91 MB optimize paket (~1.8 MB hafifletme, sıfır `node_modules`)**                               |
 
 ---
 
 ## ✨ Öne Çıkan Temel Özellikler
 
 ### ⚡ Çoklu Hesap Panosu ve Canlı Kota İzleme
-*Hesaplar arasında zahmetsizce geçiş yapın ve kota tükenme sürprizlerinden kurtulun.*
+
+_Hesaplar arasında zahmetsizce geçiş yapın ve kota tükenme sürprizlerinden kurtulun._
+
 - **Sınırsız Profil** — Kişisel, kurumsal ve müşteri Google hesaplarını birbirine karışmadan aynı anda izleyin.
 - **Sıfır Tarayıcı Açılışıyla Anında Geçiş** — Aktif Antigravity IDE hesabını pencereyi yeniden başlatmaya ve tarayıcıda onay vermeye gerek kalmadan kenar çubuğundan anında değiştirin.
 - **Canlı Kota Göstergeleri** — Renk kodlu kapasite çubukları (🟢 >%50, 🟡 %20–50, 🔴 <%20) ve dakikasına kadar tam sıfırlanma geri sayım sayaçları.
@@ -163,28 +170,36 @@ flowchart TD
 - **Abonelik Katmanı Bilgileri** — Plan türü (Ultra, Pro, Free), yapay zeka istem kredileri ve akış kredilerinin anlık gösterimi.
 
 ### 🌍 %100 Uluslararasılaştırma ve Anlık Reaktif Yerelleştirme
-*Dünya genelindeki tüm geliştiriciler için ana dillerinde uyarlandı.*
+
+_Dünya genelindeki tüm geliştiriciler için ana dillerinde uyarlandı._
+
 - **10 Yerel Dil Desteği**:
   `English (en)` • `Türkçe (tr)` • `Português (pt-BR)` • `Español (es)` • `Deutsch (de)` • `Français (fr)` • `日本語 (ja)` • `简体中文 (zh-CN)` • `हिन्दी (hi)` • `Русский (ru)`
 - **Yeniden Yüklemesiz Reaktif Geçiş** — Ayarlar sekmesinde dil değiştirdiğiniz anda arayüzün **%100'ü** (Kenar Çubuğu, Tam Editör Bento Paneli, Bağlam İnceleyici, bildirimler ve ipuçları) sayfa yenilenmeden anında çevrilir.
 - **Sistem Dili Otomatik Algılama** — İlk açılışta IDE'nizin mevcut dilini otomatik olarak tanır ve uygular.
 
 ### 🔑 Token Bütçesi ve Bağlam Penceresi Zekası
-*Ajan bağlamınızı gerçek zamanlı denetleyin ve optimize edin.*
+
+_Ajan bağlamınızı gerçek zamanlı denetleyin ve optimize edin._
+
 - **Özelleştirme Bütçesi Donutu** — MCP Araçları, Proje Kuralları, İş Akışları ve Yetenekler (Skills) tarafından tüketilen tokenların net dökümü.
 - **Aktif Bağlam Penceresi Sayacı** — Mevcut konuşma tokenlarını modelin fiziksel maksimum bağlam tavanıyla karşılaştıran canlı donut görselleştirmesi.
 - **Çalışma Alanı Bağlam Denetçisi** — Tüm `.agent/` kurallarına, iş akışlarına ve yeteneklerine çalışma zamanı durumlarıyla (`always-on`, `model-decision`, `manual`) doğrudan dosya bağlantıları.
 - **Canlı Akış Güncellemeleri** — Yapay zeka modeli yanıt üretirken token birikimini adım adım gerçek zamanlı olarak izler.
 
 ### 🔍 Bağlam Penceresi Detaylı İnceleme (Tam Editör Sekmesi)
-*Tüm sistem talimatlarını, araç çıktılarını ve adımları denetleyin.*
+
+_Tüm sistem talimatlarını, araç çıktılarını ve adımları denetleyin._
+
 - **Hiyerarşik Adım Ağacı** — Sistem İstemi, Araçlar, MCP Araçları ve Kullanıcı/Model Mesajlarının net token ve yüzde dökümü.
 - **Satır İçi Adım Önizleme** — İstemi, model yanıtını, araç girişlerini, terminal çıktılarını ve grep sonuçlarını editörden ayrılmadan inceleyin.
 - **Alev Rozetleri (🔥)** — Bağlam penceresinde en çok token tüketen adımları anında vurgulayan görsel göstergeler.
 - **Markdown Olarak Dışa Aktarma** — Denetim ve ekip paylaşımları için bağlam analizini tek tıkla panoya veya `.md` dosyasına kaydedin.
 
 ### 📈 Derin Token Analitiği ve Bento Paneli
-*Yapay zeka kullanım alışkanlıklarınıza dair kapsamlı ömür boyu zeka.*
+
+_Yapay zeka kullanım alışkanlıklarınıza dair kapsamlı ömür boyu zeka._
+
 - **Ömür Boyu Birikim** — Antigravity içinde gerçekleştirdiğiniz tüm geçmiş konuşmaları disk üzerinden tarayarak token tüketimini konsolide eder.
 - **9 Temel KPI Metriği** — Girdi, Önbellek Okuma, Çıktı, Akıl Yürütme (Reasoning) tokenları, toplam çağrılar, tahmini maliyet, aktif günler ve önbellek başarı oranı.
 - **GitHub Tarzı Katkı Isı Haritası** — Yıl seçicili 365 günlük geçmiş aktivite tablosu, hücre bazlı maliyet ipuçları ve zirve gün göstergeleri.
@@ -192,7 +207,9 @@ flowchart TD
 - **Harcama Kalıpları** — Hafta içi ve hafta sonu kullanım dağılım grafikleri ile aylık yığılmış maliyet çubukları.
 
 ### 🛡️ Konuşma Koruması (Conversation Guard) ve Sahipsiz Konuşmaları Kurtarma
-*İstemlerinizi güvence altına alın, indekslenmemiş konuşmaları veri kaybı yaşamadan kurtarın.*
+
+_İstemlerinizi güvence altına alın, indekslenmemiş konuşmaları veri kaybı yaşamadan kurtarın._
+
 - **Otomatik Uyuşmazlık Tespiti** — IDE açıldıktan sonra yerel depolamayı kenar çubuğu indeksiyle karşılaştırır.
 - **Genişletilebilir Uyarı Başlığı** — İndekste bulunmayan konuşmaların sayısını ve çözümlenen başlıklarını listeler.
 - **Tek Tıkla Bağımsız Onarım** — Bağımsız Node.js onarım çalışanı AG'yi güvenle kapatır, veritabanı indeksini diskten yeniden kurar ve IDE'yi açık çalışma alanıyla otomatik yeniden başlatır.
@@ -222,7 +239,7 @@ graph TB
         WLS["Eski Workspace LS<br/><code>--workspace_id</code><br/>(2.27 Öncesi Yedek)"]
     end
 
-    subgraph NexusAG_Core["NexusAG Eklenti Çekirdeği (v1.3.3)"]
+    subgraph NexusAG_Core["NexusAG Eklenti Çekirdeği (v1.3.4)"]
         DISCO["ServerDiscovery Motoru<br/>Faz 0 Kancası + agy Taraması"]
         AUTH["AuthBackend Seçici<br/>AgyHubBackend & LegacyUssBackend"]
         VAULT["SecretStorage & OS Keyring<br/>DPAPI / Keychain / Secret Service"]
@@ -268,6 +285,7 @@ graph TB
 ## 🚀 Başlangıç ve Kurulum
 
 ### Gereksinimler
+
 - **Google Antigravity IDE** (veya uyumlu VS Code çalışma ortamı)
 - Antigravity AI erişimi olan en az bir Google hesabı
 - İşletim Sistemi: **macOS**, **Windows** veya **Linux**
@@ -275,22 +293,27 @@ graph TB
 ### Kurulum
 
 #### 1. Yöntem: Eklenti Mağazası (Önerilen)
+
 1. Eklentiler görünümünü açın (`Ctrl+Shift+X` veya `Cmd+Shift+X`).
 2. **NexusAG** araması yapın.
 3. **Yükle** (Install) butonuna tıklayın.
 
 #### 2. Yöntem: Manuel VSIX Kurulumu
-En güncel `nexus-ag-1.3.3.vsix` paketini [GitHub Releases](https://github.com/AlperenAKKAYA99/NexusAG/releases) sayfasından indirin ve terminalden kurun:
+
+En güncel `nexus-ag-1.3.4.vsix` paketini [GitHub Releases](https://github.com/AlperenAKKAYA99/NexusAG/releases) sayfasından indirin ve terminalden kurun:
+
 ```bash
-antigravity-ide.cmd --install-extension nexus-ag-1.3.3.vsix --force
+antigravity-ide.cmd --install-extension nexus-ag-1.3.4.vsix --force
 ```
 
 ### 🎯 Kurulum Sonrası İlk Adımlar
+
 1. Etkinlik Çubuğundaki **NexusAG** simgesine tıklayın.
 2. Birincil hesabınız otomatik olarak yüklenecektir.
 3. İkincil Google hesaplarınızı eklemek için `+` butonuna tıklayın.
-4. Modelin kota yüzdesini durum çubuğunuza sabitlemek için yanındaki yıldız (★) simgesine tıklayın.
-5. Kullanım sekmesindeki **"Tam Panoyu Aç →"** butonuna basarak tüm geçmiş yapay zeka istatistiklerinizi inceleyin.
+4. Hesaplarınıza kolay ayırt edilebilen özel isimler vermek için `✏️` butonuna tıklayın (Örn: `İş Hesabı #1`).
+5. Modelin kota yüzdesini durum çubuğunuza sabitlemek için yanındaki yıldız (★) simgesine tıklayın.
+6. Kullanım sekmesindeki **"Tam Panoyu Aç →"** butonuna basarak tüm geçmiş yapay zeka istatistiklerinizi inceleyin.
 
 ---
 
@@ -298,18 +321,18 @@ antigravity-ide.cmd --install-extension nexus-ag-1.3.3.vsix --force
 
 Tüm temel özellikler VS Code Komut Paleti üzerinden tetiklenebilir (`Ctrl+Shift+P` / `Cmd+Shift+P`):
 
-| Komut | Tanımlayıcı | Açıklama |
-|---|---|---|
-| **NexusAG: Refresh Quota** | `ag.refreshQuota` | Google API'lerinden en güncel kota ve token bütçesini anında yeniler. |
-| **NexusAG: Add Account** | `ag.addAccount` | Tek tıkla tarayıcı üzerinden Google OAuth girişini başlatır. |
-| **NexusAG: Add Account via Token** | `ag.addAccountByToken` | Toplu OAuth yenileme tokenı yapıştırma penceresini açar. |
-| **NexusAG: Remove Account** | `ag.removeAccount` | Seçilen hesabı yerel depolamadan ve takipten kaldırır. |
-| **NexusAG: Open Usage Statistics** | `ag.openUsageStats` | Tam editör bento kullanım analitiği panosunu açar. |
-| **NexusAG: Fix Missing Conversations** | `ag.fixConversations` | Diski tarayarak indekste yer almayan konuşmaları onarır. |
+| Komut                                  | Tanımlayıcı            | Açıklama                                                              |
+| -------------------------------------- | ---------------------- | --------------------------------------------------------------------- |
+| **NexusAG: Refresh Quota**             | `ag.refreshQuota`      | Google API'lerinden en güncel kota ve token bütçesini anında yeniler. |
+| **NexusAG: Add Account**               | `ag.addAccount`        | Tek tıkla tarayıcı üzerinden Google OAuth girişini başlatır.          |
+| **NexusAG: Add Account via Token**     | `ag.addAccountByToken` | Toplu OAuth yenileme tokenı yapıştırma penceresini açar.              |
+| **NexusAG: Set Custom Account Name**   | `ag.setAccountLabel`   | Bağlı bir hesaba özel isim (etiket/alias) atar veya siler.            |
+| **NexusAG: Remove Account**            | `ag.removeAccount`     | Seçilen hesabı yerel depolamadan ve takipten kaldırır.                |
+| **NexusAG: Open Usage Statistics**     | `ag.openUsageStats`    | Tam editör bento kullanım analitiği panosunu açar.                    |
+| **NexusAG: Fix Missing Conversations** | `ag.fixConversations`  | Diski tarayarak indekste yer almayan konuşmaları onarır.              |
 
 ---
 
 ## 📄 Lisans ve Şeffaflık
 
 NexusAG, açık kaynaklı **[MIT Lisansı](LICENSE)** altında dağıtılmaktadır. %100 yerel veri gizliliği, sıfır dış telemetri ve sıfır çalışma zamanı bağımlılığı ile geliştirilmiştir.
-

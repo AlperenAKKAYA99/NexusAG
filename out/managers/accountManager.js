@@ -57,9 +57,47 @@ class AccountManager {
     // --- Lifecycle ---
     async initialize() {
         this.accounts = this.context.globalState.get(constants_1.ACCOUNTS_LIST_KEY, []);
+        const labels = this.getAllAccountLabels();
         for (const acc of this.accounts) {
+            if (!acc.customLabel && labels[acc.email.toLowerCase()]) {
+                acc.customLabel = labels[acc.email.toLowerCase()];
+            }
             (0, auth_1.suppressTermsNotice)(acc.email, this.context).catch(() => { });
         }
+    }
+    // --- Custom Account Labels ---
+    getAllAccountLabels() {
+        return this.context.globalState.get(constants_1.ACCOUNT_LABELS_KEY, {});
+    }
+    getAccountLabel(email) {
+        const labels = this.getAllAccountLabels();
+        return labels[(email || '').toLowerCase().trim()];
+    }
+    async setAccountLabel(email, label) {
+        const key = (email || '').toLowerCase().trim();
+        if (!key)
+            return;
+        const labels = { ...this.getAllAccountLabels() };
+        const cleanLabel = (label || '').trim();
+        if (cleanLabel) {
+            labels[key] = cleanLabel;
+        }
+        else {
+            delete labels[key];
+        }
+        await this.context.globalState.update(constants_1.ACCOUNT_LABELS_KEY, labels);
+        let updated = false;
+        this.accounts = this.accounts.map(acc => {
+            if ((acc.email || '').toLowerCase().trim() === key) {
+                updated = true;
+                return { ...acc, customLabel: cleanLabel || undefined };
+            }
+            return acc;
+        });
+        if (updated) {
+            await this.context.globalState.update(constants_1.ACCOUNTS_LIST_KEY, this.accounts);
+        }
+        this._onDidChange.fire();
     }
     // --- Account CRUD ---
     getAccounts() {
@@ -83,6 +121,9 @@ class AccountManager {
         await this.context.secrets.delete(constants_1.SECRETS_PREFIX + account.email);
         this.accounts = this.accounts.filter(a => a.id !== accountId);
         await this.context.globalState.update(constants_1.ACCOUNTS_LIST_KEY, this.accounts);
+        const labels = { ...this.getAllAccountLabels() };
+        delete labels[account.email.toLowerCase().trim()];
+        await this.context.globalState.update(constants_1.ACCOUNT_LABELS_KEY, labels);
         this.quotaCache.delete(accountId);
         this._onDidChange.fire();
     }

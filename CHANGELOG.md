@@ -2,6 +2,26 @@
 
 All notable changes to **NexusAG** are documented here.
 
+## [1.3.4] — 2026-10-30
+
+### Added
+- **Custom Account Labeling & Aliasing (`ag.accountLabels`)** — Users can assign custom aliases to connected accounts (e.g., `Work Account #1`, `Personal`, `Client Project Alpha`). The custom label is displayed prominently as the main card title, with the underlying email address preserved as a subtle, readable subtitle.
+- **Dedicated Account Rename Button & Command** — Added a `[✏️]` button in the account action drawer and registered the `ag.setAccountLabel` command in the Command Palette for quick keyboard-driven renames.
+- **3-Dot Model Status Trio & Multi-Model Health Matrix (`.acct-dot-stack`)** — Replaced the misleading single status dot with a vertical 3-dot micro matrix representing Antigravity's model families:
+  - **Top Dot (Claude Family):** Opus 4.6 / Sonnet 4.6 / Sonnet 5.5 reasoning quota.
+  - **Middle Dot (Argon / GPT-OSS 120B):** Advanced open-source or preview tier (renders as neutral grey `⚪` when Argon is disabled/unavailable, preventing false alerts).
+  - **Bottom Dot (Gemini Family):** Gemini 3.8 Flash / Pro daily fast coding quota.
+  - **Interactive Hover Tooltip:** Displays instant quota breakdown across all three tiers at a glance (e.g., `Claude: 50% | GPT-OSS: 50% | Gemini: 97%`).
+- **Collapsed Multi-Model Header Summary** — When no model is pinned with the star (`★`) button, the collapsed account card header now displays a clean, multi-family health breakdown (`Claude 50% · Gemini 97% · GPT 50%`) instead of a single bottleneck.
+- **10-Language Parity (257 translation keys)** — Added all new translation keys across English, Turkish, German, Spanish, French, Hindi, Japanese, Portuguese, Russian, and Simplified Chinese with 100% test coverage.
+
+### Fixed
+- **Eliminated False "0% Bottleneck" Red Alert on Active Accounts (`Gemini 4 Argon`)** — Fixed an issue where Antigravity's unreleased or disabled models (`disabled: true`, `tagTitle: "Unavailable"`, empty `quotaInfo: {}`) were treated as having 0% quota, causing active accounts to turn red (`🔴 Gemini 4 Argon · 0%`). NexusAG now filters out disabled/unavailable models from both card listings and bottleneck calculations.
+- **Eliminated Internal Google Cloud API Noise on Tracked Accounts** — Filtered out internal Pa test/debug counters (`Chat_20706`, `Chat_23310`), multimodal backend sub-buckets (`*-image`), and obsolete model generations (`gemini-2.5-*`) from remote tracked accounts.
+- **Fixed Frozen `dashboard.allTime` Button Translation** — Resolved a timing issue where the range selector button rendered before i18n dictionaries arrived via IPC, leaving raw `dashboard.allTime` text in the DOM. Range buttons are now reactively re-translated on load and language switches.
+- **Resolved `AraOca` Month Header Collision in Heatmap** — Fixed GitHub-style contribution calendar where the previous year's padding week (December) overlapped with January on 12px columns, creating `AraOca`. The calendar now omits prior-year padding labels and enforces a minimum 2-week spacing between month names.
+- **Localized Contribution Peak Date** — Replaced hardcoded English month names (`Oct 11`) with locale-aware date formatting (`11 Eki` in Turkish, `11 Oct` in English).
+
 ## [1.3.3] — 2026-10-30
 
 ### Fixed

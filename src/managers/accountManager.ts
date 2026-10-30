@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as crypto from 'crypto';
 import { TrackedAccount, StoredTokens, AccountQuota } from '../types';
-import { SECRETS_PREFIX, ACCOUNTS_LIST_KEY, TOKEN_REFRESH_BUFFER_SECS } from '../constants';
+import { SECRETS_PREFIX, ACCOUNTS_LIST_KEY, ACCOUNT_LABELS_KEY, TOKEN_REFRESH_BUFFER_SECS } from '../constants';
 import { GoogleAuthService } from '../services/googleAuth';
 import { QuotaApiService } from '../services/quotaApi';
 import { suppressTermsNotice } from '../services/auth';
@@ -27,9 +27,51 @@ export class AccountManager {
 
     async initialize(): Promise<void> {
         this.accounts = this.context.globalState.get<TrackedAccount[]>(ACCOUNTS_LIST_KEY, []);
+        const labels = this.getAllAccountLabels();
         for (const acc of this.accounts) {
+            if (!acc.customLabel && labels[acc.email.toLowerCase()]) {
+                acc.customLabel = labels[acc.email.toLowerCase()];
+            }
             suppressTermsNotice(acc.email, this.context).catch(() => {});
         }
+    }
+
+    // --- Custom Account Labels ---
+
+    getAllAccountLabels(): Record<string, string> {
+        return this.context.globalState.get<Record<string, string>>(ACCOUNT_LABELS_KEY, {});
+    }
+
+    getAccountLabel(email: string): string | undefined {
+        const labels = this.getAllAccountLabels();
+        return labels[(email || '').toLowerCase().trim()];
+    }
+
+    async setAccountLabel(email: string, label: string): Promise<void> {
+        const key = (email || '').toLowerCase().trim();
+        if (!key) return;
+        const labels = { ...this.getAllAccountLabels() };
+        const cleanLabel = (label || '').trim();
+        if (cleanLabel) {
+            labels[key] = cleanLabel;
+        } else {
+            delete labels[key];
+        }
+        await this.context.globalState.update(ACCOUNT_LABELS_KEY, labels);
+
+        let updated = false;
+        this.accounts = this.accounts.map(acc => {
+            if ((acc.email || '').toLowerCase().trim() === key) {
+                updated = true;
+                return { ...acc, customLabel: cleanLabel || undefined };
+            }
+            return acc;
+        });
+        if (updated) {
+            await this.context.globalState.update(ACCOUNTS_LIST_KEY, this.accounts);
+        }
+
+        this._onDidChange.fire();
     }
 
     // --- Account CRUD ---
@@ -58,6 +100,11 @@ export class AccountManager {
         await this.context.secrets.delete(SECRETS_PREFIX + account.email);
         this.accounts = this.accounts.filter(a => a.id !== accountId);
         await this.context.globalState.update(ACCOUNTS_LIST_KEY, this.accounts);
+
+        const labels = { ...this.getAllAccountLabels() };
+        delete labels[account.email.toLowerCase().trim()];
+        await this.context.globalState.update(ACCOUNT_LABELS_KEY, labels);
+
         this.quotaCache.delete(accountId);
         this._onDidChange.fire();
     }

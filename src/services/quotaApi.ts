@@ -1,5 +1,5 @@
 import * as https from 'https';
-import { QUOTA_API_ENDPOINTS, LOAD_CODE_ASSIST_ENDPOINTS, MODEL_DISPLAY_NAMES, USER_AGENT } from '../constants';
+import { QUOTA_API_ENDPOINTS, LOAD_CODE_ASSIST_ENDPOINTS, MODEL_DISPLAY_NAMES, USER_AGENT, CHAT_INTERNAL_RE } from '../constants';
 import { QuotaModel, QuotaResult, HttpError } from '../types';
 import { collectBody } from '../utils/http';
 
@@ -78,6 +78,16 @@ export class QuotaApiService {
             if (!modelId) continue;
 
             const cleanId = modelId.split('/').pop()!;
+
+            // 1. Filter out Google Cloud Pa internal test/routing buckets (e.g. Chat_20706, Chat_23310)
+            if (CHAT_INTERNAL_RE.test(cleanId) || CHAT_INTERNAL_RE.test(modelId)) continue;
+
+            // 2. Filter out non-interactive image/embedding buckets (e.g. gemini-3.1-flash-image)
+            if (cleanId.endsWith('-image') || cleanId.includes('-image-')) continue;
+
+            // 3. Filter out obsolete model generations not offered in modern Antigravity IDE (e.g. gemini-2.5-*)
+            if (cleanId.startsWith('gemini-2.5') || cleanId.startsWith('gemini-2-')) continue;
+
             const displayName = MODEL_DISPLAY_NAMES[cleanId]
                 || MODEL_DISPLAY_NAMES[modelId]
                 || QuotaApiService.humanizeModelId(cleanId);

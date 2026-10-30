@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/AlperenAKKAYA99/NexusAG/releases"><img alt="Versión" src="https://img.shields.io/badge/versi%C3%B3n-1.3.3%20(b23)-blue.svg?style=for-the-badge&logo=visualstudiocode"/></a>
+  <a href="https://github.com/AlperenAKKAYA99/NexusAG/releases"><img alt="Versión" src="https://img.shields.io/badge/versi%C3%B3n-1.3.4%20(b25)-blue.svg?style=for-the-badge&logo=visualstudiocode"/></a>
   <img alt="Plataforma" src="https://img.shields.io/badge/plataforma-macOS%20%7C%20Windows%20%7C%20Linux-6366f1.svg?style=for-the-badge&logo=apple"/>
   <img alt="Licencia" src="https://img.shields.io/badge/licencia-MIT-10b981.svg?style=for-the-badge"/>
   <img alt="Idiomas" src="https://img.shields.io/badge/idiomas-10%20nativos-ec4899.svg?style=for-the-badge&logo=google-translate"/>
@@ -38,7 +38,7 @@
 
 ## ⚡ Inicio Rápido en 60 Segundos
 
-1. **Instalar** — Busque `NexusAG` en el Marketplace de Antigravity o instale el archivo `nexus-ag-1.3.3.vsix`.
+1. **Instalar** — Busque `NexusAG` en el Marketplace de Antigravity o instale el archivo `nexus-ag-1.3.4.vsix`.
 2. **Añadir Cuenta** — Haga clic en `+` en la barra lateral para iniciar sesión con Google o use `🔑` para pegar tokens.
 3. **Monitorear y Cambiar** — ¡Sus indicadores de cuota, temporizadores y analíticas estarán activos al instante!
 
@@ -91,7 +91,7 @@
 
 ## 🆕 Arquitectura de Compatibilidad de Próxima Generación para Antigravity 2.27+
 
-Antigravity 2.27.0 sustituyó el antiguo binario `language_server_win.exe` por el motor unificado **`agy.exe --hub`**. NexusAG v1.3.3 incorpora una arquitectura modular diseñada para este estándar:
+Antigravity 2.27.0 sustituyó el antiguo binario `language_server_win.exe` por el motor unificado **`agy.exe --hub`**. NexusAG v1.3.4 incorpora una arquitectura modular diseñada para este estándar:
 
 ```mermaid
 flowchart TD
@@ -113,11 +113,13 @@ flowchart TD
 ```
 
 ### 1. Hook Directo en Fase 0 y Detección Sin Netstat
+
 - **Hook Directo (`getAgyExtensionEndpoint`):** Obtiene el `port` y `csrfToken` de la ventana activa directamente desde los exports de `google.google-antigravity`, eliminando el consumo de recursos por escaneo de procesos.
 - **Lectura Directa de `--hub-port`:** El puerto se extrae directamente de los argumentos con regex, evitando sondeos lentos con `netstat` o `lsof`.
 - **Aislamiento Multi-Ventana (`--add-dir`):** Cada ventana del IDE ejecuta su propia instancia de Hub. NexusAG compara `--add-dir` con las carpetas activas (`pathsEqual`), previniendo cambios de cuenta accidentales entre ventanas.
 
 ### 2. Cambio de Cuenta Instantáneo sin Abrir Navegador (`AgyHubBackend`)
+
 - **Inyección en Llavero Nativo:** Registra las credenciales OAuth directamente en el almacén seguro del sistema operativo:
   - **Windows:** P/Invoke `advapi32.dll CredWriteW` en Base64 hacia `gemini:antigravity`.
   - **macOS:** Comando nativo `security add-generic-password` hacia Keychain.
@@ -126,48 +128,54 @@ flowchart TD
 - **Fallback Guiado:** Si no hay tokens disponibles, NexusAG pasa automáticamente al flujo nativo guiado mediante `antigravity.internal.loginWithRedirect`.
 
 ### 3. Soporte para Almacenamiento SQLite Moderno (`isAgyHubStorage`)
+
 - Detecta automáticamente la base de datos `conversation_summaries.db` y las marcas `.done` en `~/.gemini/antigravity/`.
 - Evita falsas alarmas de conversaciones perdidas bajo el nuevo sistema SQLite.
 
 ### 4. 100% de Compatibilidad Regresiva (`LegacyUssBackend`)
+
 - Mantiene compatibilidad total con versiones anteriores a 2.27 (`language_server_*`, UnifiedStateSync y `RegisterGdmUser`).
 
 ---
 
 ## 🔄 Evolución: ¿Qué Cambió Respecto a Versiones Anteriores?
 
-| Característica / Subsistema | Versiones Anteriores (v1.0 - v1.1) | Intermedia (v1.2) | NexusAG Actual (v1.3.3 b23) |
-|---|---|---|---|
-| **Motor de Antigravity** | Solo pre-2.27 (`language_server_*`) | Detección preliminar de `agy` | **Arquitectura Dual Nativa (`AgyHubBackend` + `LegacyUssBackend`)** |
-| **Cambio de Cuenta** | Apertura obligatoria de navegador | Redirección asistida | **Cambio Instantáneo Sin Navegador vía P/Invoke en Llavero OS** |
-| **Detección de Puertos** | Sondeo lento con `netstat -ano` / `lsof` | Lectura parcial de flags | **Hook Fase 0 en Exports + Extracción directa de `--hub-port`** |
-| **Aislamiento de Ventanas** | `--workspace_id` (obsoleto en 2.27) | Coincidencia básica de texto | **Parseo estricto de `--add-dir` insensible a mayúsculas en Windows** |
-| **Depósito de Conversaciones** | Escaneo rígido de `.pb` Protobuf | Escaneo rígido de `.pb` | **Detección de `conversation_summaries.db` y marcas `.done` SQLite** |
-| **Seguridad y Aislamiento** | Escape HTML elemental | Escape HTML elemental | **`escHtml` reforzado (`&quot;`, `&#39;`), Nonce CSP, `execFile` y `stdin`** |
-| **Precios de Modelos** | Tarifas estáticas | Rama `main` mutable de LiteLLM | **Commit Inmutable de LiteLLM (`5338edb7...`) + Gemini 3.8 & Claude 4.6** |
-| **Fuentes y Estilos** | Peticiones a CDNs externas | Archivos locales sueltos | **Font Awesome Pro 7.3.1 embebido en Base64 (cero peticiones externas)** |
-| **Localización** | Inglés y Turco parcial | 10 idiomas incompletos | **10 Idiomas Nativos con 100% de paridad de claves (251/251)** |
-| **Tamaño de Paquete VSIX** | ~8.71 MB | ~8.71 MB | **6.91 MB optimizado (~1.8 MB de ahorro, cero `node_modules`)** |
+| Característica / Subsistema    | Versiones Anteriores (v1.0 - v1.1)       | Intermedia (v1.2)              | NexusAG Actual (v1.3.4 b24)                                                  |
+| ------------------------------ | ---------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------- |
+| **Motor de Antigravity**       | Solo pre-2.27 (`language_server_*`)      | Detección preliminar de `agy`  | **Arquitectura Dual Nativa (`AgyHubBackend` + `LegacyUssBackend`)**          |
+| **Cambio de Cuenta**           | Apertura obligatoria de navegador        | Redirección asistida           | **Cambio Instantáneo Sin Navegador vía P/Invoke en Llavero OS**              |
+| **Detección de Puertos**       | Sondeo lento con `netstat -ano` / `lsof` | Lectura parcial de flags       | **Hook Fase 0 en Exports + Extracción directa de `--hub-port`**              |
+| **Aislamiento de Ventanas**    | `--workspace_id` (obsoleto en 2.27)      | Coincidencia básica de texto   | **Parseo estricto de `--add-dir` insensible a mayúsculas en Windows**        |
+| **Depósito de Conversaciones** | Escaneo rígido de `.pb` Protobuf         | Escaneo rígido de `.pb`        | **Detección de `conversation_summaries.db` y marcas `.done` SQLite**         |
+| **Seguridad y Aislamiento**    | Escape HTML elemental                    | Escape HTML elemental          | **`escHtml` reforzado (`&quot;`, `&#39;`), Nonce CSP, `execFile` y `stdin`** |
+| **Precios de Modelos**         | Tarifas estáticas                        | Rama `main` mutable de LiteLLM | **Commit Inmutable de LiteLLM (`5338edb7...`) + Gemini 3.8 & Claude 4.6**    |
+| **Fuentes y Estilos**          | Peticiones a CDNs externas               | Archivos locales sueltos       | **Font Awesome Pro 7.3.1 embebido en Base64 (cero peticiones externas)**     |
+| **Localización**               | Inglés y Turco parcial                   | 10 idiomas incompletos         | **10 Idiomas Nativos con 100% de paridad de claves (251/251)**               |
+| **Tamaño de Paquete VSIX**     | ~8.71 MB                                 | ~8.71 MB                       | **6.91 MB optimizado (~1.8 MB de ahorro, cero `node_modules`)**              |
 
 ---
 
 ## ✨ Características Destacadas
 
 ### ⚡ Conmutador Multicuenta y Monitoreo de Cuotas en Vivo
+
 - **Perfiles Ilimitados:** Gestione cuentas personales, corporativas y de clientes simultáneamente.
 - **Cambio Inmediato:** Sin ventanas de navegador ni recargas del IDE.
 - **Integración en Barra de Estado:** Marque con estrella (★) sus modelos para fijar cuotas en la barra de VS Code.
 - **Renovación Proactiva:** Refresco automático de tokens en segundo plano para evitar errores 401.
 
 ### 🌍 100% Internacionalización (10 Idiomas)
+
 - `English` • `Türkçe` • `Português` • `Español` • `Deutsch` • `Français` • `日本語` • `简体中文` • `हिन्दी` • `Русский`
 - Cambio reactivo inmediato sin necesidad de recargar la ventana.
 
 ### 🔑 Presupuesto de Tokens y Ventana de Contexto
+
 - Desglose detallado de tokens consumidos por herramientas MCP, reglas de workspace y skills.
 - Medición en tiempo real durante la generación de respuestas por streaming.
 
 ### 📈 Analítica Profunda de Tokens y Dashboard Bento
+
 - Agregación histórica de todas las conversaciones de por vida.
 - Mapa de calor de contribuciones tipo GitHub para 365 días con costos por celda.
 
@@ -184,23 +192,23 @@ flowchart TD
 
 ## 🚀 Instalación y Comandos
 
-Instale `nexus-ag-1.3.3.vsix` desde el Marketplace o terminal:
+Instale `nexus-ag-1.3.4.vsix` desde el Marketplace o terminal:
+
 ```bash
-antigravity-ide.cmd --install-extension nexus-ag-1.3.3.vsix --force
+antigravity-ide.cmd --install-extension nexus-ag-1.3.4.vsix --force
 ```
 
-| Comando | ID | Descripción |
-|---|---|---|
-| **NexusAG: Refresh Quota** | `ag.refreshQuota` | Actualiza cuotas y presupuestos al instante. |
-| **NexusAG: Add Account** | `ag.addAccount` | Inicia sesión con Google vía navegador. |
-| **NexusAG: Add Account via Token** | `ag.addAccountByToken` | Pega refresh tokens por lote. |
-| **NexusAG: Remove Account** | `ag.removeAccount` | Elimina la cuenta seleccionada. |
-| **NexusAG: Open Usage Statistics** | `ag.openUsageStats` | Abre el panel bento de analíticas completas. |
-| **NexusAG: Fix Missing Conversations** | `ag.fixConversations` | Repara conversaciones no indexadas. |
+| Comando                                | ID                     | Descripción                                  |
+| -------------------------------------- | ---------------------- | -------------------------------------------- |
+| **NexusAG: Refresh Quota**             | `ag.refreshQuota`      | Actualiza cuotas y presupuestos al instante. |
+| **NexusAG: Add Account**               | `ag.addAccount`        | Inicia sesión con Google vía navegador.      |
+| **NexusAG: Add Account via Token**     | `ag.addAccountByToken` | Pega refresh tokens por lote.                |
+| **NexusAG: Remove Account**            | `ag.removeAccount`     | Elimina la cuenta seleccionada.              |
+| **NexusAG: Open Usage Statistics**     | `ag.openUsageStats`    | Abre el panel bento de analíticas completas. |
+| **NexusAG: Fix Missing Conversations** | `ag.fixConversations`  | Repara conversaciones no indexadas.          |
 
 ---
 
 ## 📄 Licencia
 
 Código abierto bajo la **[Licencia MIT](LICENSE)**.
-
