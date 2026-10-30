@@ -23,6 +23,23 @@ export function tu(key: string, params?: Record<string, string | number>): strin
     return activeTranslator(key, params);
 }
 
+export const MONTH_KEYS = [
+    'dashboard.months.jan', 'dashboard.months.feb', 'dashboard.months.mar',
+    'dashboard.months.apr', 'dashboard.months.may', 'dashboard.months.jun',
+    'dashboard.months.jul', 'dashboard.months.aug', 'dashboard.months.sep',
+    'dashboard.months.oct', 'dashboard.months.nov', 'dashboard.months.dec',
+];
+
+/** Format short date using localized month name from tu() (e.g. 11 Eki / 11 Oct) */
+export function fmtShortDateI18n(iso: string): string {
+    if (!iso || iso.length < 10) return iso;
+    const parts = iso.split('-');
+    const m = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    const mName = (m >= 0 && m < 12) ? tu(MONTH_KEYS[m]) : parts[1];
+    return `${day} ${mName}`;
+}
+
 export type UsageTotals = {
     input: number;
     output: number;
@@ -68,12 +85,12 @@ export function renderDailyBars(daily: DailyBucket[], costPerToken: number = 0):
         const ouPct = total > 0 ? (d.output / total * barW) : 0;
         const rePct = total > 0 ? ((d.reasoning || 0) / total * barW) : 0;
 
-        let tipText = fmtShortDate(d.date) + '&#10;' + tu('dashboard.costInput') + ': ' + fmtBig(d.input) + '&#10;' + tu('dashboard.costCache') + ': ' + fmtBig(d.cache) + '&#10;' + tu('dashboard.costOutput') + ': ' + fmtBig(d.output) + '&#10;' + tu('dashboard.costTotal') + ': ' + fmtBig(total) + ' (' + fmtNum(d.calls) + ' ' + tu('common.calls') + ')';
+        let tipText = fmtShortDateI18n(d.date) + '&#10;' + tu('dashboard.costInput') + ': ' + fmtBig(d.input) + '&#10;' + tu('dashboard.costCache') + ': ' + fmtBig(d.cache) + '&#10;' + tu('dashboard.costOutput') + ': ' + fmtBig(d.output) + '&#10;' + tu('dashboard.costTotal') + ': ' + fmtBig(total) + ' (' + fmtNum(d.calls) + ' ' + tu('common.calls') + ')';
         if (costPerToken > 0) {
             tipText += '&#10;' + tu('usage.estCost') + ': ' + fmtDollar(total * costPerToken);
         }
         html += '<div class="deep-daily-row" data-tip="' + tipText + '">';
-        html += '<span class="deep-daily-date">' + fmtShortDate(d.date) + '</span>';
+        html += '<span class="deep-daily-date">' + fmtShortDateI18n(d.date) + '</span>';
         html += '<div class="deep-daily-bar">';
         if (inPct > 0) html += '<div class="usage-bar-seg usage-c-input" style="width:' + inPct.toFixed(1) + '%"></div>';
         if (caPct > 0) html += '<div class="usage-bar-seg usage-c-cache" style="width:' + caPct.toFixed(1) + '%"></div>';
@@ -132,12 +149,6 @@ export function renderHourlyHeatmap(hourly: HourlyBucket[], costPerToken: number
 // ═══════════════════════════════════════════
 
 const DAY_KEYS = ['dashboard.days.mon', '', 'dashboard.days.wed', '', 'dashboard.days.fri', '', ''];
-const MONTH_KEYS = [
-    'dashboard.months.jan', 'dashboard.months.feb', 'dashboard.months.mar',
-    'dashboard.months.apr', 'dashboard.months.may', 'dashboard.months.jun',
-    'dashboard.months.jul', 'dashboard.months.aug', 'dashboard.months.sep',
-    'dashboard.months.oct', 'dashboard.months.nov', 'dashboard.months.dec',
-];
 
 /**
  * @param large — if true, uses gh-grid-lg class for bigger cells (detail panel)
@@ -193,15 +204,28 @@ export function renderDailyGrid(daily: DailyBucket[], large: boolean = false, ye
     }
     if (currentWeek.length > 0) weeks.push(currentWeek);
 
-    // Month labels
+    // Month labels (skip previous year's padding week, enforce >= 2 weeks between labels to prevent collision)
     const lgCls = large ? ' gh-grid-lg' : '';
     let html = '<div class="gh-grid-wrap' + lgCls + '">';
     html += '<div class="gh-month-row"><span class="gh-day-label"></span>';
     let lastMonth = -1;
-    for (const week of weeks) {
-        const m = new Date(week[0].date + 'T00:00:00').getMonth();
-        html += '<span class="gh-month-label">' + (m !== lastMonth ? tu(MONTH_KEYS[m]) : '') + '</span>';
-        if (m !== lastMonth) lastMonth = m;
+    let weeksSinceLastMonth = 99;
+    for (let wIdx = 0; wIdx < weeks.length; wIdx++) {
+        const week = weeks[wIdx];
+        const inYearDay = week.find(c => c.date.startsWith(String(selectedYear))) || week[0];
+        const d = new Date(inYearDay.date + 'T00:00:00');
+        const m = d.getMonth();
+        const y = d.getFullYear();
+
+        let label = '';
+        if (y === selectedYear && m !== lastMonth && weeksSinceLastMonth >= 2) {
+            label = tu(MONTH_KEYS[m]);
+            lastMonth = m;
+            weeksSinceLastMonth = 0;
+        } else {
+            weeksSinceLastMonth++;
+        }
+        html += '<span class="gh-month-label">' + label + '</span>';
     }
     html += '</div>';
 
@@ -220,8 +244,8 @@ export function renderDailyGrid(daily: DailyBucket[], large: boolean = false, ye
                 : (cell.total / maxTokens) < 0.35 ? 2
                 : (cell.total / maxTokens) < 0.65 ? 3 : 4;
             const costStr = (costPerToken > 0 && cell.total > 0) ? '&#10;~' + fmtDollar(cell.total * costPerToken) : '';
-            const title = cell.future ? fmtShortDate(cell.date)
-                : fmtShortDate(cell.date) + '&#10;' + (cell.total > 0 ? fmtBig(cell.total) + ' ' + tu('common.tokens') + '&#10;' + fmtNum(cell.calls) + ' ' + tu('common.calls') + costStr : tu('dashboard.noActivity'));
+            const title = cell.future ? fmtShortDateI18n(cell.date)
+                : fmtShortDateI18n(cell.date) + '&#10;' + (cell.total > 0 ? fmtBig(cell.total) + ' ' + tu('common.tokens') + '&#10;' + fmtNum(cell.calls) + ' ' + tu('common.calls') + costStr : tu('dashboard.noActivity'));
             html += '<div class="gh-cell gh-lvl-' + level + '" data-tip="' + title + '"></div>';
         }
         html += '</div>';
@@ -232,7 +256,7 @@ export function renderDailyGrid(daily: DailyBucket[], large: boolean = false, ye
     html += '<div class="gh-footer">';
     html += '<span class="gh-legend">' + tu('dashboard.less') + ' <span class="gh-cell gh-lvl-0 gh-sm"></span><span class="gh-cell gh-lvl-1 gh-sm"></span><span class="gh-cell gh-lvl-2 gh-sm"></span><span class="gh-cell gh-lvl-3 gh-sm"></span><span class="gh-cell gh-lvl-4 gh-sm"></span> ' + tu('dashboard.moreLegend') + '</span>';
     if (peakDay.total > 0) {
-        html += '<span class="gh-peak">' + tu('dashboard.peak') + ' <strong>' + fmtShortDate(peakDay.date) + '</strong> (' + fmtBig(peakDay.total) + ')</span>';
+        html += '<span class="gh-peak">' + tu('dashboard.peak') + ' <strong>' + fmtShortDateI18n(peakDay.date) + '</strong> (' + fmtBig(peakDay.total) + ')</span>';
     }
     html += '</div>';
     html += '</div>';
@@ -817,7 +841,9 @@ export function renderRangeBar(activeRange: string, cssPrefix: string = 'deep'):
     let html = `<div class="${cssPrefix}-range-bar" id="usageRangeBar">`;
     for (const r of RANGES) {
         const active = activeRange === r.id ? ' active' : '';
-        const label = r.id === 'all' ? tu('dashboard.allTime') : r.label;
+        const label = r.id === 'all'
+            ? (tu('dashboard.ranges.allTime') || tu('dashboard.allTime') || 'All Time')
+            : r.label;
         html += `<button class="${cssPrefix}-range-btn${active}" data-action="set-usage-range" data-range="${r.id}">${label}</button>`;
     }
     html += '</div>';

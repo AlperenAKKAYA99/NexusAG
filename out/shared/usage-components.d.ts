@@ -7,6 +7,9 @@ import { DailyBucket, HourlyBucket, ModelBucket, CascadeBucket, MonthlyBucket, P
 export type TranslateFn = (key: string, params?: Record<string, string | number>) => string;
 export declare function setUsageTranslator(fn: TranslateFn): void;
 export declare function tu(key: string, params?: Record<string, string | number>): string;
+export declare const MONTH_KEYS: string[];
+/** Format short date using localized month name from tu() (e.g. 11 Eki / 11 Oct) */
+export declare function fmtShortDateI18n(iso: string): string;
 export type UsageTotals = {
     input: number;
     output: number;

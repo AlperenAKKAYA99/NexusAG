@@ -6,7 +6,7 @@ import { getWebviewContent } from '../templates/webviewTemplate';
 import { getPricing } from '../shared/usage-components';
 import { ConversationGuard } from '../services/conversationGuard';
 import { createLogger } from '../utils/logger';
-import { getLocale, getTranslations, setLocale } from '../i18n';
+import { getLocale, getTranslations, setLocale, t } from '../i18n';
 import { UsageStatsPanel } from './usageStatsPanel';
 import { ContextDetailPanel } from './contextDetailPanel';
 
@@ -120,6 +120,26 @@ export class QuotaViewProvider implements vscode.WebviewViewProvider {
                 case 'copyToken':
                     this.quotaManager.copyToken(msg.accountId);
                     break;
+                case 'editAccountLabel': {
+                    const email = msg.email;
+                    if (!email) break;
+                    const currentLabel = this.accountManager.getAccountLabel(email) || '';
+                    const newLabel = await vscode.window.showInputBox({
+                        title: t('accounts.setLabelTitle'),
+                        prompt: t('accounts.setLabelPrompt'),
+                        value: currentLabel,
+                        placeHolder: t('accounts.setLabelPlaceholder'),
+                        validateInput: (val: string) => {
+                            if (val.trim().length > 40) return 'Label is too long (max 40 characters)';
+                            return null;
+                        },
+                    });
+                    if (newLabel !== undefined) {
+                        await this.accountManager.setAccountLabel(email, newLabel.trim());
+                        this.quotaManager.pushCachedData();
+                    }
+                    break;
+                }
                 case 'openUsagePanel':
                     vscode.commands.executeCommand('ag.openUsageStats');
                     break;

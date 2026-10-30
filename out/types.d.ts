@@ -4,6 +4,7 @@ export interface TrackedAccount {
     id: string;
     email: string;
     name: string;
+    customLabel?: string;
     addedAt: number;
 }
 /** Stored token data (stored in Secrets API) */
@@ -54,6 +55,12 @@ export interface ModelCard {
     resetTime: string;
     isLocal: boolean;
 }
+/** 3-family status for multi-dot status matrix */
+export interface ModelFamilyStatus {
+    claudePct: number | null;
+    argonGptPct: number | null;
+    geminiPct: number | null;
+}
 /**
  * Pre-processed account card — renderer does ZERO logic.
  * Built by quotaManager.buildAccountCards(), consumed by webview renderAll().
@@ -61,6 +68,8 @@ export interface ModelCard {
 export interface AccountCard {
     email: string;
     name?: string;
+    customLabel?: string;
+    familyStatus?: ModelFamilyStatus;
     isActive: boolean;
     trackingId?: string;
     models: ModelCard[];
@@ -151,6 +160,10 @@ export interface ClientModelConfig {
         model?: string;
     };
     quotaInfo?: ModelQuotaInfo;
+    disabled?: boolean;
+    tagTitle?: string;
+    tagDescription?: string;
+    modelId?: string;
 }
 /** Local LS GetUserStatus response shape */
 export interface LocalQuotaData {

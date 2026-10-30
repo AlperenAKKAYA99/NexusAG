@@ -4,13 +4,21 @@
  * is done in quotaManager.buildAccountCards() on the extension host side.
  */
 
-import { dotClass, fillClass, timeLeft, shortModelName, shortTierName, fmtNum } from '../../shared/helpers';
+import { dotClass, fillClass, timeLeft, shortModelName, shortTierName, fmtNum, escHtml } from '../../shared/helpers';
 import { t } from '../../i18n/i18nClient';
 
 // Font Awesome icon constants for tracked account action buttons
 const SWITCH_SVG = '<i class="fa-solid fa-right-left"></i>';
 const KEY_SVG = '<i class="fa-solid fa-key"></i>';
 const TRASH_SVG = '<i class="fa-solid fa-trash-can"></i>';
+const EDIT_SVG = '<i class="fa-solid fa-pen"></i>';
+
+function miniDotClass(pct: number | null): string {
+    if (pct === null) return 'x';
+    if (pct >= 50) return 'g';
+    if (pct >= 20) return 'y';
+    return 'r';
+}
 
 /** Track previous active email to detect account switches and auto-collapse */
 let _lastActiveEmail = '';
@@ -93,12 +101,29 @@ export function renderAll(cards: any[], pinnedModels: Record<string, string>): v
         const wasOpen = switched
             ? a.isActive
             : (openStates[a.email] !== undefined ? openStates[a.email] : a.isActive);
-        const minPct = a.bottleneck ? a.bottleneck.pct : 0;
-        const dotCls = a.isError ? 'x' : dotClass(minPct);
         const openCls = wasOpen ? ' open' : '';
 
+        // 3-dot family status
+        const fam = a.familyStatus;
+        const cPct = fam ? fam.claudePct : null;
+        const aPct = fam ? fam.argonGptPct : null;
+        const gPct = fam ? fam.geminiPct : null;
+
+        const cTip = 'Claude: ' + (cPct !== null ? cPct + '%' : t('common.na'));
+        const aTip = (aPct !== null ? 'GPT/Argon: ' + aPct + '%' : 'Argon: ' + t('common.na'));
+        const gTip = 'Gemini: ' + (gPct !== null ? gPct + '%' : t('common.na'));
+        const stackTip = `${cTip} | ${aTip} | ${gTip}`;
+
+        const dotStackHtml = a.isError
+            ? '<div class="acct-dot-stack error" title="' + (a.errorMessage || t('common.error')) + '"><div class="acct-mini-dot r"></div><div class="acct-mini-dot r"></div><div class="acct-mini-dot r"></div></div>'
+            : '<div class="acct-dot-stack" title="' + stackTip + '">'
+                + '<div class="acct-mini-dot ' + miniDotClass(cPct) + '" title="' + cTip + '"></div>'
+                + '<div class="acct-mini-dot ' + miniDotClass(aPct) + '" title="' + aTip + '"></div>'
+                + '<div class="acct-mini-dot ' + miniDotClass(gPct) + '" title="' + gTip + '"></div>'
+                + '</div>';
+
         // Action buttons:
-        // On active card: Switch and Remove are disabled/passive, Copy Token is ACTIVE.
+        // On active card: Switch and Remove are disabled/passive, Copy Token & Edit Label are ACTIVE.
         // On inactive cards: All actions are enabled.
         const trackingId = a.trackingId || a.email;
         const actionBtns = trackingId
@@ -106,6 +131,7 @@ export function renderAll(cards: any[], pinnedModels: Record<string, string>): v
               + (a.isActive
                   ? '<button class="acct-switch is-disabled" disabled title="' + t('accounts.switchDisabled') + '" aria-disabled="true">' + SWITCH_SVG + '</button>'
                   : '<button class="acct-switch" title="' + t('accounts.switch') + '" data-action="switch-account" data-id="' + trackingId + '">' + SWITCH_SVG + '</button>')
+              + '<button class="acct-tag" title="' + t('accounts.editLabel') + '" data-action="edit-label" data-email="' + a.email + '">' + EDIT_SVG + '</button>'
               + '<button class="acct-key" title="' + t('accounts.copyToken') + '" data-action="copy-token" data-id="' + trackingId + '">' + KEY_SVG + '</button>'
               + (a.isActive
                   ? '<button class="acct-del is-disabled" disabled title="' + t('accounts.removeDisabled') + '" aria-disabled="true">' + TRASH_SVG + '</button>'
@@ -135,23 +161,44 @@ export function renderAll(cards: any[], pinnedModels: Record<string, string>): v
             creditsLine = '<div class="acct-credits">' + chips + '</div>';
         }
 
-        // Pinned or bottleneck for collapsed view
+        // Pinned or 3-family breakdown for collapsed view
         let subBlock = '';
         if (a.isError) {
             subBlock = '<div class="acct-sub"><span style="color:var(--error)"><i class="fa-solid fa-triangle-exclamation"></i> ' + (a.errorMessage || t('common.error')) + '</span></div>';
         } else {
             const pinnedLabel = pinnedModels[a.email];
-            const displayModel = pinnedLabel
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                ? (a.models.find((m: any) => m.label === pinnedLabel) || a.bottleneck)
-                : a.bottleneck;
-            if (displayModel) {
-                const bnLabel = displayModel.label || shortModelName(displayModel.id);
-                const pctCls = fillClass(displayModel.pct);
-                const tl = timeLeft(displayModel.resetTime);
+            if (pinnedLabel) {
+                const displayModel = a.models.find((m: any) => m.label === pinnedLabel) || a.bottleneck;
+                if (displayModel) {
+                    const bnLabel = displayModel.label || shortModelName(displayModel.id);
+                    const pctCls = fillClass(displayModel.pct);
+                    const tl = timeLeft(displayModel.resetTime);
+                    subBlock = '<div class="acct-sub">'
+                        + '<i class="fa-solid fa-star" style="color:#e5a50a;font-size:10px;margin-right:3px;"></i> '
+                        + '<span class="bn-model">' + bnLabel + '</span> \u00b7 '
+                        + '<span class="bn-pct ' + pctCls + '">' + displayModel.pct + '%</span>'
+                        + (tl ? ' <span class="bn-sep">\u00b7</span> ' + tl : '')
+                        + '</div>';
+                }
+            } else if (fam && (fam.claudePct !== null || fam.geminiPct !== null)) {
+                const pills: string[] = [];
+                if (fam.claudePct !== null) {
+                    pills.push('<span class="fam-pill"><span class="fam-k">Claude</span> <span class="fam-v ' + fillClass(fam.claudePct) + '">' + fam.claudePct + '%</span></span>');
+                }
+                if (fam.geminiPct !== null) {
+                    pills.push('<span class="fam-pill"><span class="fam-k">Gemini</span> <span class="fam-v ' + fillClass(fam.geminiPct) + '">' + fam.geminiPct + '%</span></span>');
+                }
+                if (fam.argonGptPct !== null) {
+                    pills.push('<span class="fam-pill"><span class="fam-k">GPT</span> <span class="fam-v ' + fillClass(fam.argonGptPct) + '">' + fam.argonGptPct + '%</span></span>');
+                }
+                subBlock = '<div class="acct-sub acct-fam-sub">' + pills.join(' <span class="bn-sep">\u00b7</span> ') + '</div>';
+            } else if (a.bottleneck) {
+                const bnLabel = a.bottleneck.label || shortModelName(a.bottleneck.id);
+                const pctCls = fillClass(a.bottleneck.pct);
+                const tl = timeLeft(a.bottleneck.resetTime);
                 subBlock = '<div class="acct-sub">'
                     + '<span class="bn-model">' + bnLabel + '</span> \u00b7 '
-                    + '<span class="bn-pct ' + pctCls + '">' + displayModel.pct + '%</span>'
+                    + '<span class="bn-pct ' + pctCls + '">' + a.bottleneck.pct + '%</span>'
                     + (tl ? ' <span class="bn-sep">\u00b7</span> ' + tl : '')
                     + '</div>';
             } else {
@@ -159,12 +206,20 @@ export function renderAll(cards: any[], pinnedModels: Record<string, string>): v
             }
         }
 
+        let emailHtml = '';
+        if (a.customLabel) {
+            emailHtml = '<div class="acct-custom-label"><span class="acct-label-text">' + escHtml(a.customLabel) + '</span> ' + activeBadge + ' ' + tierBadge + transitionBadge + '</div>'
+                + '<div class="acct-email-sub">' + a.email + '</div>';
+        } else {
+            emailHtml = '<div class="acct-email">' + a.email + ' ' + activeBadge + ' ' + tierBadge + transitionBadge + '</div>';
+        }
+
         const activeCls = a.isActive ? ' acct-active' : '';
         html += '<div class="acct' + activeCls + openCls + '" data-email="' + a.email + '">';
         html += '<div class="acct-hdr" data-action="toggle-open">';
-        html += '<div class="acct-dot ' + dotCls + '"></div>';
+        html += dotStackHtml;
         html += '<div class="acct-info">';
-        html += '<div class="acct-email">' + a.email + ' ' + activeBadge + ' ' + tierBadge + transitionBadge + '</div>';
+        html += emailHtml;
         html += subBlock;
         html += creditsLine;
         html += '</div>';

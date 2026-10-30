@@ -12,6 +12,9 @@ export declare class AccountManager {
     constructor(context: vscode.ExtensionContext);
     getAuthService(): GoogleAuthService;
     initialize(): Promise<void>;
+    getAllAccountLabels(): Record<string, string>;
+    getAccountLabel(email: string): string | undefined;
+    setAccountLabel(email: string, label: string): Promise<void>;
     getAccounts(): TrackedAccount[];
     getQuotaCache(): Map<string, AccountQuota>;
     addAccount(): Promise<boolean>;

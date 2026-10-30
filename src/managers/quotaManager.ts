@@ -137,6 +137,7 @@ export class QuotaManager {
             this.lastActiveEmail,
             !!this.switchController,
             this.getSelectedModels(),
+            this.accountManager.getAllAccountLabels(),
         );
         return cards;
     }

@@ -136,6 +136,7 @@ const ACTIONS: Record<string, (t: HTMLElement) => void> = {
     'set-interval':         t => pickInterval(t),
     'switch-account':       t => switchAccount(t.dataset.id!),
     'copy-token':           t => copyToken(t.dataset.id!),
+    'edit-label':           t => vscode.postMessage({ type: 'editAccountLabel', email: t.dataset.email }),
     'remove-account':       t => removeAccount(t.dataset.id!),
     'toggle-open':          t => toggleOpen(t),
     'pin-model':            t => pinModel(t.dataset.accountKey!, t.dataset.modelId!),
