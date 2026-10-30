@@ -30,7 +30,7 @@ import { StatsCache } from './cache';
 import { ProcessLock } from './processLock';
 import { getGlobalIndexData } from '../../shared/titleResolver';
 import { concurrentPool } from './pool';
-import { BRAIN_DIR } from '../../shared/agPaths';
+import { BRAIN_DIR, ALL_BRAIN_DIRS } from '../../shared/agPaths';
 
 const log = createLogger('UsageStats');
 
@@ -200,20 +200,21 @@ export class UsageStatsService {
      * Partition conversation IDs into hot (mtime > cutoff) and cold.
      */
     private partitionByMtime(ids: string[], cutoffMs: number): { hot: string[]; cold: string[] } {
-        const brainDir = BRAIN_DIR;
+        const dirs = [BRAIN_DIR, ...ALL_BRAIN_DIRS.filter(d => d !== BRAIN_DIR)].filter(Boolean);
         const hot: string[] = [];
         const cold: string[] = [];
         for (const cid of ids) {
-            try {
-                const stat = fs.statSync(path.join(brainDir, cid));
-                if (stat.mtimeMs > cutoffMs) {
-                    hot.push(cid);
-                } else {
-                    cold.push(cid);
-                }
-            } catch { // EXPECTED: directory deleted between readdir and stat — treat as hot
-                // Can't stat → treat as hot (fetch it)
+            let maxMtime = 0;
+            for (const dir of dirs) {
+                try {
+                    const stat = fs.statSync(path.join(dir, cid));
+                    if (stat.mtimeMs > maxMtime) maxMtime = stat.mtimeMs;
+                } catch { /* try next dir */ }
+            }
+            if (maxMtime === 0 || maxMtime > cutoffMs) {
                 hot.push(cid);
+            } else {
+                cold.push(cid);
             }
         }
         return { hot, cold };
@@ -657,24 +658,28 @@ export class UsageStatsService {
         return result.stats;
     }
 
-    /** Scan ~/.gemini/antigravity/brain/ for conversation UUIDs */
+    /** Scan ~/.gemini/antigravity/brain/ (and legacy antigravity-ide/brain/) for conversation UUIDs */
     private discoverConversationIds(): string[] {
-        const brainDir = BRAIN_DIR;
-        if (!fs.existsSync(brainDir)) {
-            log.warn(`discoverConversationIds: brain dir does not exist: ${brainDir}`);
+        const dirs = [BRAIN_DIR, ...ALL_BRAIN_DIRS.filter(d => d !== BRAIN_DIR)].filter(Boolean);
+        if (dirs.length === 0) {
+            log.warn('discoverConversationIds: no brain dirs exist');
             return [];
         }
 
         const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        try {
-            const allEntries = fs.readdirSync(brainDir, { withFileTypes: true });
-            const uuidDirs = allEntries.filter(d => d.isDirectory() && UUID_RE.test(d.name));
-            log.diag(`discoverConversationIds: brain dir has ${allEntries.length} total entries, ${uuidDirs.length} are UUID conversation dirs`);
-            return uuidDirs.map(d => d.name);
-        } catch (e: any) {
-            log.warn(`discoverConversationIds: failed to read brain dir: ${e?.message}`);
-            return [];
+        const seen = new Set<string>();
+        for (const dir of dirs) {
+            try {
+                if (!fs.existsSync(dir)) continue;
+                const allEntries = fs.readdirSync(dir, { withFileTypes: true });
+                const uuidDirs = allEntries.filter(d => d.isDirectory() && UUID_RE.test(d.name));
+                for (const d of uuidDirs) seen.add(d.name);
+            } catch (e: any) {
+                log.warn(`discoverConversationIds: failed to read brain dir ${dir}: ${e?.message}`);
+            }
         }
+        log.diag(`discoverConversationIds: found ${seen.size} unique UUID conversation dirs across ${dirs.length} brain dir(s)`);
+        return [...seen];
     }
 
     // ─── Response Extractors ───

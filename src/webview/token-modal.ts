@@ -1,19 +1,14 @@
+/**
+ * Token Modal — handles multi-token account addition dialog in the webview.
+ */
 import { vscode } from './context';
 import { t } from '../i18n/i18nClient';
-import { extractTokens } from '../shared/tokenExportFormatter';
 
 let isSubmitting = false;
 
-function esc(str: string): string {
-    return (str || '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-}
-
 function parseTokens(text: string): string[] {
-    return extractTokens(text);
+    const raw = text.split(/[\r\n\s,;]+/).map(t => t.trim()).filter(Boolean);
+    return [...new Set(raw)];
 }
 
 export function initTokenModal(): void {
@@ -154,7 +149,7 @@ export function onTokensProcessed(result: {
     if (result.successCount > 0 && result.failedCount === 0) {
         // All tokens succeeded
         status.className = 'ag-modal-status success';
-        const emails = esc(result.results.filter(r => r.success).map(r => r.email).join(', '));
+        const emails = result.results.filter(r => r.success).map(r => r.email).join(', ');
         const successMsg = result.successCount === 1
             ? t('modal.successAll_one', { count: 1 })
             : t('modal.successAll_other', { count: result.successCount });
@@ -171,7 +166,7 @@ export function onTokensProcessed(result: {
     } else if (result.successCount > 0 && result.failedCount > 0) {
         // Partial success
         status.className = 'ag-modal-status warning';
-        const successful = esc(result.results.filter(r => r.success).map(r => r.email).join(', '));
+        const successful = result.results.filter(r => r.success).map(r => r.email).join(', ');
         const failedTokens = result.results.filter(r => !r.success).map(r => r.token);
 
         status.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i><div><strong>${t('modal.partialSuccess', { success: result.successCount, failed: result.failedCount })}</strong><div style="font-size:10px;opacity:.85;margin-top:2px">${successful}</div></div>`;

@@ -45,7 +45,7 @@ export declare class ConversationGuard implements vscode.Disposable {
     /** Resolve titles & dates for missing conversations (for UI display).
      *  lsTitles: optional map from GetAllCascadeTrajectories LS endpoint (highest fidelity) */
     resolveMissingDetails(ids: string[], lsTitles?: Map<string, string>): MissingConversationDetail[];
-    /** Spawn detached worker to fix conversations — AG will quit */
+    /** Spawn detached worker to fix conversations — AG will quit (pre-2.27 .pb storage only) */
     runFix(extraRelaunchInfo?: Record<string, any>): void;
     dispose(): void;
 }

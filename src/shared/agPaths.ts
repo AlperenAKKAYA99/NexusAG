@@ -23,6 +23,64 @@ function findFirstExisting(...candidates: string[]): string {
     return candidates[0] || '';
 }
 
+function findAllExisting(...candidates: string[]): string[] {
+    return candidates.filter(c => Boolean(c) && fs.existsSync(c));
+}
+
+/**
+ * Returns true if a conversations directory has `.done` migration markers or
+ * zero `.pb` files, indicating Antigravity ≥ 2.27 migrated away from it.
+ */
+export function isMigratedConversationsDir(dir: string): boolean {
+    try {
+        if (!fs.existsSync(dir)) return false;
+        const entries = fs.readdirSync(dir);
+        return entries.some(f => f.endsWith('.done'));
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Resolve the active `.gemini/<app_data_dir>/<subdir>` directory.
+ *
+ * Antigravity ≥ 2.27.0 launches `agy --hub --app_data_dir=antigravity` and
+ * leaves `.done` migration markers in `~/.gemini/antigravity-ide/conversations`.
+ * Prefer `antigravity` when it exists and either has active SQLite storage
+ * (`conversation_summaries.db`) or `antigravity-ide` is marked migrated.
+ */
+function resolveGeminiSubdir(subdir: 'conversations' | 'brain'): string {
+    const agyDir = path.join(os.homedir(), '.gemini', 'antigravity', subdir);
+    const legacyIdeDir = path.join(os.homedir(), '.gemini', 'antigravity-ide', subdir);
+    const summariesDb = path.join(os.homedir(), '.gemini', 'antigravity', 'conversation_summaries.db');
+    const legacyConvDir = path.join(os.homedir(), '.gemini', 'antigravity-ide', 'conversations');
+
+    if (fs.existsSync(agyDir) && (fs.existsSync(summariesDb) || isMigratedConversationsDir(legacyConvDir))) {
+        return agyDir;
+    }
+    return findFirstExisting(agyDir, legacyIdeDir);
+}
+
+/**
+ * Returns true when Antigravity ≥ 2.27 Hub SQLite conversation storage is active
+ * (`conversation_summaries.db` exists or conversations are stored as `.db` with no `.pb` files).
+ */
+export function isAgyHubStorage(convDir?: string): boolean {
+    try {
+        const summariesDb = path.join(os.homedir(), '.gemini', 'antigravity', 'conversation_summaries.db');
+        if (fs.existsSync(summariesDb)) return true;
+
+        const targetDir = convDir || CONVERSATIONS_DIR;
+        if (!targetDir || !fs.existsSync(targetDir)) return false;
+        const files = fs.readdirSync(targetDir);
+        const hasPb = files.some(f => f.endsWith('.pb'));
+        const hasDb = files.some(f => f.endsWith('.db'));
+        return hasDb && !hasPb;
+    } catch {
+        return false;
+    }
+}
+
 // ─── Antigravity Application Paths ───────────────────────────────────
 
 /** Path to Antigravity's local state SQLite DB (conversation index, active account, etc.) */
@@ -43,16 +101,22 @@ export const STATE_DB_PATH = isMac
             )
             : '';
 
-/** Directory containing conversation .pb protobuf files */
-export const CONVERSATIONS_DIR = findFirstExisting(
+/** Directory containing conversation files (.db in ≥ 2.27, .pb in < 2.27) */
+export const CONVERSATIONS_DIR = resolveGeminiSubdir('conversations');
+
+/** All existing conversation directories (new `antigravity` + legacy `antigravity-ide`) */
+export const ALL_CONVERSATIONS_DIRS = findAllExisting(
+    path.join(os.homedir(), '.gemini', 'antigravity', 'conversations'),
     path.join(os.homedir(), '.gemini', 'antigravity-ide', 'conversations'),
-    path.join(os.homedir(), '.gemini', 'antigravity', 'conversations')
 );
 
 /** Directory containing conversation brain data (transcripts, artifacts) */
-export const BRAIN_DIR = findFirstExisting(
+export const BRAIN_DIR = resolveGeminiSubdir('brain');
+
+/** All existing brain directories (new `antigravity` + legacy `antigravity-ide`) */
+export const ALL_BRAIN_DIRS = findAllExisting(
+    path.join(os.homedir(), '.gemini', 'antigravity', 'brain'),
     path.join(os.homedir(), '.gemini', 'antigravity-ide', 'brain'),
-    path.join(os.homedir(), '.gemini', 'antigravity', 'brain')
 );
 
 /** Ordered list of candidate cert paths for the local language server */
@@ -74,8 +138,23 @@ export const LS_CERT_PATHS: string[] = isMac
             ]
             : [];
 
-/** grep pattern to find the LS binary in `ps` output */
+/**
+ * grep pattern to find the LS binary in `ps` output.
+ *
+ * Antigravity ≥ 2.27.0 replaced the standalone `language_server_*` binary with
+ * `agy.exe --hub`.  We search for the NEW binary first; legacy fallback is
+ * handled separately in serverDiscovery.ts.
+ */
 export const LS_PROCESS_GREP = isMac
+    ? 'agy'
+    : isLinux
+        ? 'agy'
+        : isWindows
+            ? 'agy'
+            : 'agy';
+
+/** Legacy process name for Antigravity < 2.27.0 fallback */
+export const LS_PROCESS_GREP_LEGACY = isMac
     ? 'language_server_macos'
     : isLinux
         ? 'language_server_linux'

@@ -5,7 +5,6 @@ import { AccountSwitchService } from '../services/accountSwitch';
 import { ContextWindowData } from '../services/contextWindow';
 import { QuotaViewProvider } from '../providers/quotaViewProvider';
 import { ConversationGuard } from '../services/conversationGuard';
-import { TokenExportFormat } from '../shared/tokenExportFormatter';
 export declare class QuotaManager {
     private readonly context;
     private readonly accountManager;
@@ -114,23 +113,8 @@ export declare class QuotaManager {
     setConversationGuard(convGuard: ConversationGuard): void;
     /** Switch the active IDE account to a tracked account */
     switchAccount(accountId: string): Promise<void>;
-    /**
-     * Resolves a refresh token for an account id or email with USS and SwitchService fallbacks.
-     */
-    resolveAccountRefreshToken(accountIdOrEmail: string): Promise<string | null>;
     /** Copy refresh_token to clipboard for sharing */
-    copyToken(accountId: string): Promise<boolean>;
-    /**
-     * Copy multiple refresh tokens to clipboard in the specified format.
-     * Webview or caller sends account IDs (or empty for all).
-     */
-    copyTokens(accountIds?: string[], format?: TokenExportFormat): Promise<{
-        total: number;
-        copiedCount: number;
-        missingCount: number;
-        copiedEmails: string[];
-        missingEmails: string[];
-    }>;
+    copyToken(accountId: string): Promise<void>;
     /** Shared helper: resolve server + fetch cascade trajectory summaries */
     private fetchCascadeSummaries;
     /**
@@ -147,7 +131,7 @@ export declare class QuotaManager {
     /** Workspace ID matching LS --workspace_id format: slashes+hyphens → underscores */
     private getWorkspaceId;
     /** Delegate to EmailResolver */
-    private getActiveEmail;
+    getActiveEmail(): Promise<string>;
     private updateStatusBar;
     /** Diagnostic probe: log raw LS remainingFraction per model (only in diag mode) */
     private logQuotaFractions;

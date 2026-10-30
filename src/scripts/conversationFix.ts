@@ -38,6 +38,24 @@ interface RelaunchInfo {
     };
 }
 
+async function persistAccountAuthStatus(info: RelaunchInfo): Promise<boolean> {
+    if (!info.authStatus) return true;
+
+    try {
+        const authJson = JSON.stringify(info.authStatus);
+        const hexAuth = Buffer.from(authJson, 'utf-8').toString('hex');
+        const saved = await dbExecRaw(
+            `INSERT OR REPLACE INTO ItemTable (key, value) VALUES ('antigravityAuthStatus', CAST(X'${hexAuth}' AS TEXT));`,
+        );
+        if (!saved) throw new Error('dbExecRaw returned false');
+        log.info(`Account switch authStatus persisted for ${info.authStatus.email}`);
+        return true;
+    } catch (e: unknown) {
+        log.error(`Account switch authStatus persistence failed: ${(e as Error).message}`);
+        return false;
+    }
+}
+
 // ─── Title Helpers (isGenericTitle, getTitleFromBrain, getTitleFromTranscript
 // are imported from shared/titleResolver.ts — SSOT) ──────────────────
 
@@ -259,7 +277,21 @@ async function main(): Promise<void> {
     }
 
     // 3. Validate paths
-    if (!fs.existsSync(STATE_DB_PATH)) { log.error('DB not found'); relaunchAG(relaunchInfo); return; }
+    if (!fs.existsSync(STATE_DB_PATH)) {
+        log.error('DB not found');
+        if (relaunchInfo.authStatus) {
+            log.error('Account switch credentials cannot be persisted; refusing account-switch relaunch.');
+            return;
+        }
+        relaunchAG(relaunchInfo);
+        return;
+    }
+    if (!await persistAccountAuthStatus(relaunchInfo)) {
+        if (relaunchInfo.authStatus) {
+            log.error('Account switch relaunch cancelled because credentials were not persisted.');
+            return;
+        }
+    }
     if (!fs.existsSync(CONVERSATIONS_DIR)) { log.error('Conv dir not found'); relaunchAG(relaunchInfo); return; }
 
     // 4. Read existing index via shared/db.ts
@@ -328,18 +360,6 @@ async function main(): Promise<void> {
         log.error(`Writing index failed: ${(e as Error).message}`);
         relaunchAG(relaunchInfo);
         return;
-    }
-
-    // 10b. If authStatus is provided (account switch transition), persist it to ItemTable
-    if (relaunchInfo.authStatus) {
-        try {
-            const authJson = JSON.stringify(relaunchInfo.authStatus);
-            const hexAuth = Buffer.from(authJson, 'utf-8').toString('hex');
-            await dbExecRaw(`INSERT OR REPLACE INTO ItemTable (key, value) VALUES ('antigravityAuthStatus', CAST(X'${hexAuth}' AS TEXT));`);
-            log.info(`Account switch authStatus persisted for ${relaunchInfo.authStatus.email}`);
-        } catch (e: unknown) {
-            log.warn(`Auth persistence warning: ${(e as Error).message}`);
-        }
     }
 
     // 11. Relaunch AG

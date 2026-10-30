@@ -105,9 +105,6 @@ export function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.
                     <button class="s-btn" id="refreshBtn" data-i18n-title="common.refresh" title="Refresh" data-action="refresh">
                         <i class="fa-solid fa-arrows-rotate"></i>
                     </button>
-                    <button class="s-btn" data-i18n-title="accounts.copyTokens" title="Copy Tokens" data-action="open-token-export">
-                        <i class="fa-solid fa-copy"></i>
-                    </button>
                     <button class="s-btn" data-i18n-title="accounts.addViaToken" title="Add via Token" data-action="add-account-by-token">
                         <i class="fa-solid fa-key"></i>
                     </button>
@@ -129,10 +126,6 @@ export function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.
                 <button class="add-btn" data-action="add-account-by-token">
                     <i class="fa-solid fa-key"></i>
                     <span data-i18n="accounts.addViaToken">Add via Token</span>
-                </button>
-                <button class="add-btn" data-action="open-token-export">
-                    <i class="fa-solid fa-copy"></i>
-                    <span data-i18n="accounts.copyTokens">Copy Tokens</span>
                 </button>
             </div>
         </div>
@@ -360,63 +353,6 @@ export function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.
                 <button class="ag-modal-btn ag-btn-primary" id="submitTokensBtn" data-action="submit-tokens" disabled>
                     <i class="fa-solid fa-plus"></i>
                     <span data-i18n="modal.addAccounts">Add Accounts</span>
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Copy Accounts Tokens Modal -->
-    <div id="tokenExportModal" class="ag-modal-backdrop hidden" style="display:none">
-        <div class="ag-modal ag-export-modal">
-            <div class="ag-modal-header">
-                <div class="ag-modal-title">
-                    <i class="fa-solid fa-copy"></i>
-                    <span data-i18n="export.title">Copy Account Tokens</span>
-                </div>
-                <button class="ag-modal-close" data-action="close-token-export" data-i18n-title="modal.closeEsc" title="Close (Esc)">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            </div>
-            <div class="ag-modal-body">
-                <p class="ag-modal-desc" data-i18n="export.desc">
-                    Select accounts to copy refresh tokens to clipboard:
-                </p>
-
-                <!-- Filter shortcuts -->
-                <div class="ag-export-tools">
-                    <span class="ag-export-tools-label" data-i18n="common.items">Select:</span>
-                    <button class="ag-filter-pill" data-action="export-select-all" data-i18n="export.selectAll">All</button>
-                    <button class="ag-filter-pill" data-action="export-select-none" data-i18n="export.selectNone">None</button>
-                    <button class="ag-filter-pill" data-action="export-select-healthy" data-i18n="export.selectHealthy">Healthy</button>
-                </div>
-
-                <!-- Account Checkbox List -->
-                <div class="ag-export-list" id="exportAccountList"></div>
-
-                <!-- Format selector -->
-                <div class="ag-format-section">
-                    <div class="ag-format-hdr">
-                        <span data-i18n="export.format">Format</span>
-                    </div>
-                    <div class="ag-format-pills">
-                        <button class="ag-format-btn active" data-action="set-export-format" data-format="plain" data-i18n="export.formatPlain">Plain</button>
-                        <button class="ag-format-btn" data-action="set-export-format" data-format="labeled" data-i18n="export.formatLabeled">Labeled</button>
-                        <button class="ag-format-btn" data-action="set-export-format" data-format="json" data-i18n="export.formatJson">JSON</button>
-                    </div>
-                </div>
-
-                <div class="ag-token-counter">
-                    <span id="exportCounter">0 accounts selected</span>
-                    <span class="ag-token-hint" data-i18n="modal.ctrlEnter">Ctrl+Enter to copy</span>
-                </div>
-
-                <div id="exportModalStatus" class="ag-modal-status" style="display:none"></div>
-            </div>
-            <div class="ag-modal-footer">
-                <button class="ag-modal-btn ag-btn-secondary" data-action="close-token-export" data-i18n="common.cancel">Cancel</button>
-                <button class="ag-modal-btn ag-btn-primary" id="submitExportBtn" data-action="submit-token-export">
-                    <i class="fa-solid fa-copy"></i>
-                    <span data-i18n="export.copy_one">Copy</span>
                 </button>
             </div>
         </div>

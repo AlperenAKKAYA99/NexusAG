@@ -10,6 +10,8 @@ import { updatePricing, setExternalPricingResolver } from './shared/usage-compon
 import { initPricingCatalog, resolveLiteLlmPricing } from './services/litellmPricing';
 import { ConversationTracker } from './services/conversationTracker';
 import { ConversationGuard } from './services/conversationGuard';
+import { isAgyHubStorage } from './shared/agPaths';
+import { suppressTermsNotice } from './services/auth';
 import { callLsJson } from './utils/lsClient';
 import { initLogger, createLogger, setFileSink, setDiagSink } from './utils/logger';
 import { initI18n, getLocale, getTranslations, setLocale, t } from './i18n';
@@ -35,6 +37,13 @@ export async function activate(context: vscode.ExtensionContext) {
     accountManager.initialize();
 
     const quotaManager = new QuotaManager(context, accountManager);
+
+    // Suppress recurring "Security Notice & Data Use" prompt for active account
+    quotaManager.getActiveEmail().then(email => {
+        if (email) {
+            suppressTermsNotice(email, context).catch(() => {});
+        }
+    }).catch(() => {});
 
     // Non-blocking USS API check
     quotaManager.getSwitchService().testApiAccess().then(ok => {
@@ -144,52 +153,6 @@ export async function activate(context: vscode.ExtensionContext) {
             }
         }),
 
-        vscode.commands.registerCommand('ag.copyTokens', async () => {
-            const accounts = accountManager.getAccounts();
-            if (accounts.length === 0) {
-                vscode.window.showWarningMessage(t('export.noneFound'));
-                return;
-            }
-
-            // QuickPick for account selection
-            interface AccountQuickPickItem extends vscode.QuickPickItem {
-                id: string;
-            }
-
-            const items: AccountQuickPickItem[] = accounts.map(a => ({
-                id: a.id,
-                label: `$(account) ${a.email}`,
-                description: a.name !== a.email ? a.name : undefined,
-                picked: true,
-            }));
-
-            const selected = await vscode.window.showQuickPick(items, {
-                title: t('export.title'),
-                placeHolder: t('export.desc'),
-                canPickMany: true,
-                ignoreFocusOut: true,
-            });
-
-            if (!selected || selected.length === 0) return;
-
-            // Format QuickPick
-            const formatItems = [
-                { id: 'plain', label: t('export.formatPlain'), description: '1//0eAAA...\n1//0eBBB...' },
-                { id: 'labeled', label: t('export.formatLabeled'), description: '# user@example.com\n1//0eAAA...' },
-                { id: 'json', label: t('export.formatJson'), description: '[ { "email": "...", "refresh_token": "..." } ]' },
-            ];
-
-            const defaultFormat = vscode.workspace.getConfiguration('ag-switchboard').get<string>('tokenExport.defaultFormat', 'plain');
-            const chosenFormatItem = await vscode.window.showQuickPick(formatItems, {
-                title: t('export.format'),
-                placeHolder: formatItems.find(f => f.id === defaultFormat)?.label || formatItems[0].label,
-                ignoreFocusOut: true,
-            });
-
-            const chosenFormat = (chosenFormatItem?.id || defaultFormat) as any;
-            await quotaManager.copyTokens(selected.map(s => s.id), chosenFormat);
-        }),
-
         vscode.commands.registerCommand('ag.openUsageStats', () => {
             UsageStatsPanel.createOrShow(context.extensionUri, quotaManager.getLastUsageStats());
             if (UsageStatsPanel.currentPanel) {
@@ -211,6 +174,10 @@ export async function activate(context: vscode.ExtensionContext) {
             }
         }),
         vscode.commands.registerCommand('ag.fixConversations', async () => {
+            if (isAgyHubStorage()) {
+                vscode.window.showInformationMessage(t('notify.noMissingConv'));
+                return;
+            }
             const status = await convGuard.detect();
             const count = status?.missing ?? 0;
 

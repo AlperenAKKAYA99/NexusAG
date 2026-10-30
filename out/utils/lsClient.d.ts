@@ -24,15 +24,43 @@ export interface LsEndpoint {
     csrf: string;
     /** workspace_id from LS process args — used to match the active workspace */
     wsId?: string;
+    /** Workspace paths from agy --add-dir arguments */
+    workspaceDirs?: string[];
+    /** True when the endpoint belongs to an Antigravity ≥ 2.27 `agy --hub` process */
+    isHub?: boolean;
 }
+/** Extract all values for a process argument, preserving quoted paths with spaces. */
+export declare function extractCommandLineArgumentValues(commandLine: string, name: string): string[];
+/** Compare paths using the active platform's path and case rules. */
+export declare function pathsEqual(left: string, right: string): boolean;
+/**
+ * Read the current window's `agy --hub` endpoint directly from the built-in
+ * `google.google-antigravity` extension exports (`{ csrfToken, port, client, getRpcClient }`).
+ *
+ * In Antigravity IDE ≥ 2.27.0, the built-in extension spawns `agy --hub` without `--add-dir`
+ * and exposes its exact `port` and `csrfToken` via `extension.exports`. Reading this directly
+ * avoids PowerShell/WMIC process scanning and guarantees window-scoped accuracy even when
+ * multiple IDE windows are open.
+ */
+export declare function getAgyExtensionEndpoint(): LsEndpoint | null;
 /**
  * Find active Language Server processes and extract their HTTPS port + CSRF token
- * directly from process arguments (--https_server_port, --csrf_token).
+ * directly from process arguments.
+ *
+ * Antigravity ≥ 2.27.0:
+ *   1. Fast path: read `{ port, csrfToken }` directly from `google.google-antigravity` extension exports.
+ *   2. Process fallback: `agy.exe --hub --hub-port=PORT --csrf_token=TOKEN`
+ * Pre-2.27.0: `language_server_win --https_server_port=PORT --csrf_token=TOKEN`
+ *   → uses --https_server_port as the HTTPS-only port.
  *
  * Cross-platform: ps on macOS/Linux, wmic on Windows.
  * Returns an empty array (never throws) so callers can safely ignore LS absence.
  */
 export declare function findLSEndpoints(): Promise<LsEndpoint[]>;
+/**
+ * Returns true if any Antigravity ≥ 2.27 `agy --hub` process is currently running.
+ */
+export declare function isAgyHubActive(): Promise<boolean>;
 /**
  * Load the Language Server's self-signed TLS certificate.
  * Tries a dynamic path relative to the LS binary first, then falls back to
@@ -44,6 +72,11 @@ export declare function findLSEndpoints(): Promise<LsEndpoint[]>;
 export declare function loadLSCert(): Buffer | undefined;
 /**
  * Make a ConnectRPC-style POST to a Language Server endpoint.
+ *
+ * Antigravity ≥ 2.27.0 (`ls.isHub === true`): `agy --hub` serves plain HTTP
+ * on `--hub-port` with no TLS cert, so we use HTTP directly and avoid wasted
+ * TLS handshake failures.
+ * Pre-2.27.0: tries HTTPS first, then falls back to HTTP.
  *
  * @param ls       - Endpoint info (port + CSRF token)
  * @param endpoint - Full gRPC path, e.g.

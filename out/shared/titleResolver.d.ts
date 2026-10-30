@@ -16,7 +16,7 @@ export declare function isGenericTitle(title: string | null): boolean;
  */
 export declare function getTitleFromBrain(cid: string, maxLen?: number): string | null;
 /**
- * Extract the first user prompt from overview.txt (conversation transcript log).
+ * Extract the first user prompt from overview.txt or transcript.jsonl (conversation transcript log).
  * Reads only the first 8KB for performance — most user requests appear in the header.
  */
 export declare function getTitleFromTranscript(cid: string, maxLen?: number): string | null;

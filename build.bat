@@ -55,13 +55,11 @@ if %errorlevel% neq 0 (
 )
 
 :: 4.5 Clean previous .vsix packages
-if not exist "dist\" mkdir dist
-if exist "dist\*.vsix" del /q "dist\*.vsix"
 if exist "*.vsix" del /q "*.vsix"
 
 :: 5. Package VSIX
-echo [*] Packaging .vsix extension into dist/...
-call npx @vscode/vsce package --no-dependencies -o dist/
+echo [*] Packaging .vsix extension...
+call npx @vscode/vsce package --no-dependencies
 if %errorlevel% neq 0 (
     echo [ERROR] VSIX packaging failed!
     pause
@@ -77,12 +75,12 @@ echo.
 set "VSIX_NAME="
 set "VSIX_PATH="
 set "VSIX_SIZE="
-for %%F in (dist\*.vsix) do (
+for %%F in (*.vsix) do (
     set "VSIX_NAME=%%~nxF"
     set "VSIX_PATH=%%~fF"
     set "VSIX_SIZE=%%~zF"
 )
-echo Package: !VSIX_NAME! [!VSIX_SIZE! bytes] in dist/
+echo Package: !VSIX_NAME! [!VSIX_SIZE! bytes]
 
 :: Check for --install parameter
 if "%1"=="--install" goto install_ext

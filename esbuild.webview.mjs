@@ -35,14 +35,14 @@ if (!existsSync(faFontsDir)) mkdirSync(faFontsDir, { recursive: true });
 // Copy only required woff2 files to out/webview/webfonts
 const requiredFonts = ['fa-solid-900.woff2', 'fa-regular-400.woff2', 'fa-brands-400.woff2'];
 for (const font of requiredFonts) {
-    const src = resolve(__dirname, 'assets/fonts/webfonts', font);
+    const src = resolve(__dirname, 'web_fonts/webfonts', font);
     if (existsSync(src)) copyFileSync(src, resolve(faFontsDir, font));
 }
 
 // Read all.css and embed primary woff2 fonts as Base64 to bypass VS Code webview relative-URI resolution limits
-let allCss = readFileSync(resolve(__dirname, 'assets/fonts/css/all.css'), 'utf8');
+let allCss = readFileSync(resolve(__dirname, 'web_fonts/css/all.css'), 'utf8');
 
-const solidWoff2Path = resolve(__dirname, 'assets/fonts/webfonts/fa-solid-900.woff2');
+const solidWoff2Path = resolve(__dirname, 'web_fonts/webfonts/fa-solid-900.woff2');
 if (existsSync(solidWoff2Path)) {
     const solidBase64 = readFileSync(solidWoff2Path).toString('base64');
     allCss = allCss.replace(
@@ -51,7 +51,7 @@ if (existsSync(solidWoff2Path)) {
     );
 }
 
-const regularWoff2Path = resolve(__dirname, 'assets/fonts/webfonts/fa-regular-400.woff2');
+const regularWoff2Path = resolve(__dirname, 'web_fonts/webfonts/fa-regular-400.woff2');
 if (existsSync(regularWoff2Path)) {
     const regularBase64 = readFileSync(regularWoff2Path).toString('base64');
     allCss = allCss.replace(
@@ -60,7 +60,7 @@ if (existsSync(regularWoff2Path)) {
     );
 }
 
-const brandsWoff2Path = resolve(__dirname, 'assets/fonts/webfonts/fa-brands-400.woff2');
+const brandsWoff2Path = resolve(__dirname, 'web_fonts/webfonts/fa-brands-400.woff2');
 if (existsSync(brandsWoff2Path)) {
     const brandsBase64 = readFileSync(brandsWoff2Path).toString('base64');
     allCss = allCss.replace(

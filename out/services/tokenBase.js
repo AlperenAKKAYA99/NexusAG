@@ -249,7 +249,14 @@ class TokenBaseService {
             // filter to only items whose URI matches this workspace's path.
             if (workspaceFsPath) {
                 const before = raw.length;
-                raw = raw.filter(item => item.uri.includes(workspaceFsPath));
+                if (before === 0) {
+                    return null;
+                }
+                const normWsPath = workspaceFsPath.replace(/\\/g, '/').toLowerCase();
+                raw = raw.filter(item => {
+                    const normUri = decodeURIComponent(item.uri).replace(/\\/g, '/').toLowerCase();
+                    return normUri.includes(normWsPath);
+                });
                 if (raw.length < before) {
                     log.warn(`Workspace context: filtered ${before - raw.length} items from other workspace(s)`);
                 }

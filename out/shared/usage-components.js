@@ -337,6 +337,10 @@ let pricing = {
     opus: { input: 5.00, output: 25.00, cache: 0.50, reasoning: 25.00 },
     sonnet: { input: 3.00, output: 15.00, cache: 0.30, reasoning: 15.00 },
     haiku: { input: 1.00, output: 5.00, cache: 0.10, reasoning: 5.00 },
+    // Gemini 3.8 family (Antigravity ≥ 2.27.0)
+    'gemini-3.8-flash-high': { input: 0.60, output: 3.50, cache: 0.06, reasoning: 3.50 },
+    'gemini-3.8-flash-medium': { input: 0.50, output: 3.00, cache: 0.05, reasoning: 3.00 },
+    'gemini-3.8-flash-low': { input: 0.40, output: 2.50, cache: 0.04, reasoning: 2.50 },
     // Gemini 3.x family
     'gemini-3-pro': { input: 2.00, output: 12.00, cache: 0.20, reasoning: 12.00 },
     'gemini-3-flash': { input: 0.50, output: 3.00, cache: 0.05, reasoning: 3.00 },
@@ -380,12 +384,20 @@ function matchPricing(displayName) {
         return pricing['haiku'];
     if (lower.includes('sonnet'))
         return pricing['sonnet'];
-    // Gemini tiers — version-aware (2.5 vs 3.x)
+    // Gemini tiers — version-aware (3.8 vs 3.x vs 2.5)
     if (lower.includes('flash lite') || lower.includes('flash-lite'))
         return pricing['flash-lite'];
     if (lower.includes('checkpoint'))
         return { input: 0, output: 0, cache: 0, reasoning: 0 };
+    const is38 = lower.includes('3.8') || lower.includes('3_8');
     const is25 = lower.includes('2.5') || lower.includes('2_5');
+    if (is38 && lower.includes('flash')) {
+        if (lower.includes('high'))
+            return pricing['gemini-3.8-flash-high'];
+        if (lower.includes('low'))
+            return pricing['gemini-3.8-flash-low'];
+        return pricing['gemini-3.8-flash-medium'];
+    }
     if (lower.includes('flash'))
         return pricing[is25 ? 'gemini-2-flash' : 'gemini-3-flash'];
     if (lower.includes('pro') || lower.includes('gemini'))
