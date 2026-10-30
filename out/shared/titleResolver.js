@@ -52,6 +52,21 @@ const path = __importStar(require("path"));
 const agPaths_1 = require("./agPaths");
 const protobuf_1 = require("./protobuf");
 const db_1 = require("./db");
+/** Locate the brain directory for a conversation UUID across primary + legacy brain dirs */
+function resolveBrainConvoDir(cid) {
+    const candidates = [agPaths_1.BRAIN_DIR, ...agPaths_1.ALL_BRAIN_DIRS.filter(d => d !== agPaths_1.BRAIN_DIR)];
+    for (const base of candidates) {
+        if (!base)
+            continue;
+        const p = path.join(base, cid);
+        try {
+            if (fs.existsSync(p) && fs.statSync(p).isDirectory())
+                return p;
+        }
+        catch { /* ignore */ }
+    }
+    return null;
+}
 // ─── Generic Title Detection ────────────────────────────────────────
 /** Returns true if the title is auto-generated/useless (e.g., "New Conversation", "Untitled") */
 function isGenericTitle(title) {
@@ -72,8 +87,8 @@ function isGenericTitle(title) {
  * Returns the first non-trivial line of text, or null if nothing useful found.
  */
 function getTitleFromBrain(cid, maxLen = 55) {
-    const brainPath = path.join(agPaths_1.BRAIN_DIR, cid);
-    if (!fs.existsSync(brainPath) || !fs.statSync(brainPath).isDirectory())
+    const brainPath = resolveBrainConvoDir(cid);
+    if (!brainPath)
         return null;
     try {
         const files = fs.readdirSync(brainPath)
@@ -103,12 +118,17 @@ function getTitleFromBrain(cid, maxLen = 55) {
 }
 // ─── Transcript Title Extraction ────────────────────────────────────
 /**
- * Extract the first user prompt from overview.txt (conversation transcript log).
+ * Extract the first user prompt from overview.txt or transcript.jsonl (conversation transcript log).
  * Reads only the first 8KB for performance — most user requests appear in the header.
  */
 function getTitleFromTranscript(cid, maxLen = 55) {
-    const logPath = path.join(agPaths_1.BRAIN_DIR, cid, '.system_generated', 'logs', 'overview.txt');
-    if (!fs.existsSync(logPath))
+    const brainPath = resolveBrainConvoDir(cid);
+    if (!brainPath)
+        return null;
+    const overviewPath = path.join(brainPath, '.system_generated', 'logs', 'overview.txt');
+    const jsonlPath = path.join(brainPath, '.system_generated', 'logs', 'transcript.jsonl');
+    const logPath = fs.existsSync(overviewPath) ? overviewPath : (fs.existsSync(jsonlPath) ? jsonlPath : '');
+    if (!logPath)
         return null;
     try {
         const fd = fs.openSync(logPath, 'r');

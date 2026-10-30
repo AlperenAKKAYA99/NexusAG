@@ -2,8 +2,8 @@
   "name": "nexus-ag",
   "displayName": "NexusAG",
   "description": "Switch between Antigravity accounts instantly. Monitor AI quotas, token budgets and reset timers — all in one sidebar panel.",
-  "icon": "assets/icons/icon.png",
-  "version": "1.1.1",
+  "icon": "assets/icon.png",
+  "version": "1.3.3",
   "publisher": "AlperenAKKAYA99",
   "license": "MIT",
   "repository": {
@@ -39,7 +39,7 @@
         {
           "id": "ag-switchboard",
           "title": "NexusAG",
-          "icon": "assets/icons/icon.svg"
+          "icon": "assets/icon.svg"
         }
       ]
     },
@@ -49,7 +49,7 @@
           "type": "webview",
           "id": "ag.quotaView",
           "name": "Accounts",
-          "icon": "assets/icons/icon.svg"
+          "icon": "assets/icon.svg"
         }
       ]
     },
@@ -78,11 +78,6 @@
         "command": "ag.openUsageStats",
         "title": "NexusAG: Open Usage Statistics",
         "icon": "$(graph)"
-      },
-      {
-        "command": "ag.copyTokens",
-        "title": "NexusAG: Copy Account Tokens",
-        "icon": "$(copy)"
       },
       {
         "command": "ag.fixConversations",
@@ -186,30 +181,10 @@
           "default": true,
           "description": "Automatically run Fix Missing Conversations and relaunch Antigravity when switching accounts to keep conversation index intact."
         },
-        "ag-switchboard.tokenExport.defaultFormat": {
-          "type": "string",
-          "default": "plain",
-          "enum": [
-            "plain",
-            "labeled",
-            "json"
-          ],
-          "enumDescriptions": [
-            "Plain list of tokens, one per line",
-            "Labeled with account emails as comments",
-            "Structured JSON array of account objects"
-          ],
-          "description": "Default formatting style when copying multiple account tokens."
-        },
-        "ag-switchboard.tokenExport.clearClipboardSeconds": {
-          "type": "number",
-          "default": 0,
-          "description": "Automatically clear tokens from the clipboard after N seconds for enhanced security (0 disables auto-clearing)."
-        },
-        "ag-switchboard.tokenExport.confirmBulkCopy": {
+        "ag-switchboard.confirmSwitch": {
           "type": "boolean",
-          "default": true,
-          "description": "Show confirmation modal warning before copying multiple account tokens to the clipboard."
+          "default": false,
+          "description": "Show confirmation dialog before switching accounts. When disabled, clicking an account card switches directly."
         }
       }
     }
@@ -222,8 +197,8 @@
     "compile:webview": "node esbuild.webview.mjs",
     "watch": "node scripts/sync-version.js && tsc -watch -p ./tsconfig.extension.json",
     "watch:webview": "node esbuild.webview.mjs --watch",
-    "package": "node scripts/sync-version.js && npm run compile:extension && node esbuild.webview.mjs --production && vsce package --no-dependencies -o dist/",
-    "publish:ovsx": "ovsx publish dist/*.vsix"
+    "package": "node scripts/sync-version.js && npm run compile:extension && node esbuild.webview.mjs --production && vsce package --no-dependencies",
+    "publish:ovsx": "ovsx publish *.vsix"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

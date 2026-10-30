@@ -76,6 +76,10 @@ class ConversationGuard {
      */
     async detect() {
         try {
+            if ((0, agPaths_1.isAgyHubStorage)(agPaths_1.CONVERSATIONS_DIR)) {
+                log.info('Detection skipped: Antigravity ≥ 2.27 Hub SQLite conversation storage active');
+                return null;
+            }
             if (!fs.existsSync(agPaths_1.CONVERSATIONS_DIR))
                 return null;
             const pbFiles = fs.readdirSync(agPaths_1.CONVERSATIONS_DIR).filter(f => f.endsWith('.pb'));
@@ -174,8 +178,12 @@ class ConversationGuard {
             return { id, title, date };
         }).sort((a, b) => b.date.localeCompare(a.date));
     }
-    /** Spawn detached worker to fix conversations — AG will quit */
+    /** Spawn detached worker to fix conversations — AG will quit (pre-2.27 .pb storage only) */
     runFix(extraRelaunchInfo) {
+        if ((0, agPaths_1.isAgyHubStorage)(agPaths_1.CONVERSATIONS_DIR)) {
+            log.info('runFix skipped: Antigravity ≥ 2.27 uses Hub SQLite storage (.db); index rebuild not applicable');
+            return;
+        }
         const workerPath = path.join(__dirname, '..', 'scripts', 'conversationFix.js');
         if (!fs.existsSync(workerPath)) {
             log.error(`Worker script not found: ${workerPath}`);

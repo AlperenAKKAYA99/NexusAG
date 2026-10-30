@@ -120,16 +120,6 @@ export class QuotaViewProvider implements vscode.WebviewViewProvider {
                 case 'copyToken':
                     this.quotaManager.copyToken(msg.accountId);
                     break;
-                case 'copyTokens': {
-                    const accountIds = Array.isArray(msg.accountIds) ? msg.accountIds : undefined;
-                    const format = ['plain', 'labeled', 'json'].includes(msg.format) ? msg.format : 'plain';
-                    const result = await this.quotaManager.copyTokens(accountIds, format as any);
-                    this._view?.webview.postMessage({
-                        type: 'tokensCopied',
-                        result,
-                    });
-                    break;
-                }
                 case 'openUsagePanel':
                     vscode.commands.executeCommand('ag.openUsageStats');
                     break;

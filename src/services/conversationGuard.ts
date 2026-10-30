@@ -10,7 +10,7 @@ import * as fs from 'fs';
 import * as cp from 'child_process';
 import * as path from 'path';
 import { STATE_DB_PATH } from '../constants';
-import { CONVERSATIONS_DIR, BRAIN_DIR } from '../shared/agPaths';
+import { CONVERSATIONS_DIR, BRAIN_DIR, isAgyHubStorage } from '../shared/agPaths';
 import { getGlobalIndexData, isGenericTitle, getTitleFromBrain, getTitleFromTranscript } from '../shared/titleResolver';
 import { isDbAvailable } from '../shared/db';
 import { createLogger } from '../utils/logger';
@@ -58,6 +58,10 @@ export class ConversationGuard implements vscode.Disposable {
      */
     async detect(): Promise<ConversationStatus | null> {
         try {
+            if (isAgyHubStorage(CONVERSATIONS_DIR)) {
+                log.info('Detection skipped: Antigravity ≥ 2.27 Hub SQLite conversation storage active');
+                return null;
+            }
             if (!fs.existsSync(CONVERSATIONS_DIR)) return null;
 
             const pbFiles = fs.readdirSync(CONVERSATIONS_DIR).filter(f => f.endsWith('.pb'));
@@ -161,8 +165,12 @@ export class ConversationGuard implements vscode.Disposable {
         }).sort((a, b) => b.date.localeCompare(a.date));
     }
 
-    /** Spawn detached worker to fix conversations — AG will quit */
+    /** Spawn detached worker to fix conversations — AG will quit (pre-2.27 .pb storage only) */
     runFix(extraRelaunchInfo?: Record<string, any>): void {
+        if (isAgyHubStorage(CONVERSATIONS_DIR)) {
+            log.info('runFix skipped: Antigravity ≥ 2.27 uses Hub SQLite storage (.db); index rebuild not applicable');
+            return;
+        }
         const workerPath = path.join(__dirname, '..', 'scripts', 'conversationFix.js');
 
         if (!fs.existsSync(workerPath)) {

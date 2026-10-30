@@ -3,25 +3,29 @@ export declare class ServerDiscoveryService {
     /**
      * Discover the local Antigravity language server.
      *
-     * Strategy:
-     * 1. Process scan → find language_server PIDs + LSP CSRF tokens
-     * 2. Port scan → find actual TCP listening ports for each PID
-     * 3. Probe each port+CSRF combination until GetUserStatus responds
+     * Strategy (Antigravity ≥ 2.27.0):
+     * 1. Process scan → find `agy.exe --hub` processes with --hub-port and --csrf_token
+     * 2. Match workspace via --add-dir against vscode.workspace.workspaceFolders
+     * 3. Port is directly known from --hub-port — no netstat scan needed
+     * 4. Probe the known port+CSRF until GetUserStatus responds
      *
-     * macOS/Linux: uses `ps` + `lsof`
-     * Windows:     uses `wmic` + `netstat`
+     * Fallback (pre-2.27.0):
+     * 1. Find `language_server_*` processes
+     * 2. Port scan via netstat
+     * 3. Probe each candidate
      */
     discover(workspaceId?: string): Promise<ServerInfo | null>;
     /**
      * Discover the LS instance that handles cascade/chat operations.
      *
-     * The IDE runs TWO LS processes:
-     *   1. Workspace LS (--workspace_id, --enable_lsp) → code completions, quota
-     *   2. Global LS (no workspace_id) → cascade/chat inference, generator metadata
+     * Antigravity ≥ 2.27.0 architecture:
+     *   Each IDE window spawns a SINGLE `agy --hub` instance that handles
+     *   BOTH code completions AND cascade/chat — no separate Global LS.
+     *   The hub-port is the same for workspace and cascade operations.
      *
-     * Context window data (GetCascadeTrajectory, generator metadata) lives on the
-     * GLOBAL LS. Standard discover() finds the workspace LS, which returns empty
-     * trajectory data for cascades it doesn't manage.
+     * Pre-2.27.0 architecture:
+     *   Two separate LS instances (Workspace + Global). The Global LS
+     *   holds cascade data. We probe all candidates to find the right one.
      *
      * Strategy: try ALL LS instances, probe each with GetCascadeTrajectory for the
      * given cascadeId, and return the one that has actual data (numTotalGeneratorMetadata > 0).
@@ -30,8 +34,18 @@ export declare class ServerDiscoveryService {
     discoverCascadeServer(cascadeId: string, workspaceServer?: ServerInfo | null): Promise<ServerInfo | null>;
     /** macOS / Linux: use ps to find candidates */
     private findCandidatesUnix;
-    /** Windows: use PowerShell + wmic fallback to find candidates (with PID) */
+    /**
+     * Windows: use PowerShell + wmic fallback to find candidates (with PID).
+     *
+     * Searches for BOTH agy.exe --hub (new) and language_server_win (legacy).
+     * Prefers agy hub candidates when both are present.
+     */
     private findCandidatesWindows;
+    /**
+     * Find Windows processes matching `grep` pattern and parse their command lines.
+     * Prefers PowerShell Get-WmiObject, falls back to wmic CSV, then CommandLine-only.
+     */
+    private findWindowsProcessesByGrep;
     /** Parse `ps` stdout into candidates */
     private parsePsOutput;
     /** Get TCP listening ports for a specific PID */

@@ -16,7 +16,10 @@ tsconfig*.json
 *.tsbuildinfo
 esbuild.webview.mjs
 .github/**
+.agent/**
 docs/**
-dist/**
-assets/fonts/**
-*.vsix
+assets/logo/**
+CYBER_SECURITY_AUDIT_REPORT.md
+Nexusag-Uyumluluk-Analizi.md
+plan.md
+web_fonts/**

@@ -4,7 +4,7 @@ import { TrackedAccount, StoredTokens, AccountQuota } from '../types';
 import { SECRETS_PREFIX, ACCOUNTS_LIST_KEY, TOKEN_REFRESH_BUFFER_SECS } from '../constants';
 import { GoogleAuthService } from '../services/googleAuth';
 import { QuotaApiService } from '../services/quotaApi';
-import { extractTokens } from '../shared/tokenExportFormatter';
+import { suppressTermsNotice } from '../services/auth';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('AccountManager');
@@ -27,6 +27,9 @@ export class AccountManager {
 
     async initialize(): Promise<void> {
         this.accounts = this.context.globalState.get<TrackedAccount[]>(ACCOUNTS_LIST_KEY, []);
+        for (const acc of this.accounts) {
+            suppressTermsNotice(acc.email, this.context).catch(() => {});
+        }
     }
 
     // --- Account CRUD ---
@@ -175,9 +178,12 @@ export class AccountManager {
             status?: 'added' | 'updated';
         }>;
     }> {
-        const tokens = Array.isArray(input)
-            ? [...new Set(input.flatMap(t => extractTokens(t)))]
-            : extractTokens(input);
+        const rawTokens = (Array.isArray(input) ? input : input.split(/[\r\n\s,;]+/))
+            .map(t => t.trim())
+            .filter(t => t.length > 0);
+
+        // Deduplicate tokens
+        const tokens = [...new Set(rawTokens)];
 
         if (tokens.length === 0) {
             return { total: 0, successCount: 0, failedCount: 0, results: [] };
@@ -322,38 +328,6 @@ export class AccountManager {
         return null;
     }
 
-    /**
-     * Get refresh tokens for multiple accounts in bulk.
-     * Parallel lookup without network calls (reads from OS SecretStorage).
-     */
-    async getRefreshTokensBulk(idsOrEmails: string[]): Promise<Array<{
-        id: string;
-        email?: string;
-        name?: string;
-        token: string | null;
-        error?: string;
-    }>> {
-        return Promise.all(
-            idsOrEmails.map(async (idOrEmail) => {
-                const cleanId = idOrEmail.replace(/^active:/, '').trim().toLowerCase();
-                const account = this.accounts.find(a =>
-                    a.id.toLowerCase() === cleanId ||
-                    (a.email && a.email.toLowerCase() === cleanId)
-                );
-                const email = account?.email || (cleanId.includes('@') ? cleanId : undefined);
-                const name = account?.name;
-                const id = account?.id || idOrEmail;
-
-                try {
-                    const token = await this.getRefreshToken(idOrEmail);
-                    return { id, email, name, token };
-                } catch (err: any) {
-                    return { id, email, name, token: null, error: err?.message || String(err) };
-                }
-            })
-        );
-    }
-
     // --- DRY Helpers ---
 
     /**
@@ -387,6 +361,8 @@ export class AccountManager {
             if (!silent) vscode.window.showInformationMessage(`✅ Account added: ${email}`);
             status = 'added';
         }
+
+        await suppressTermsNotice(email, this.context).catch(() => {});
 
         if (!skipNotifyEvent) {
             this._onDidChange.fire();

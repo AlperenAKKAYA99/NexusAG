@@ -57,6 +57,8 @@ function buildAccountCards(localData, trackedQuotas, activeEmailRaw, switchActiv
     const labelMap = buildLabelMap(localData);
     const status = localData?.userStatus;
     const localEmail = (status?.email || '').toLowerCase();
+    // When no switch is actively in-flight, the local Hub/LS email is authoritative
+    const effectiveActiveEmail = (!switchActive && localEmail) ? localEmail : activeEmail;
     if (status) {
         const rawModels = (status.cascadeModelConfigData?.clientModelConfigs || [])
             .filter((m) => m.quotaInfo)
@@ -83,7 +85,7 @@ function buildAccountCards(localData, trackedQuotas, activeEmailRaw, switchActiv
         cards.push({
             email: status.email || 'active-local',
             name: matchingTracked?.account.name,
-            isActive: !activeEmail || activeEmail === localEmail,
+            isActive: !effectiveActiveEmail || effectiveActiveEmail === localEmail,
             isTransitioning,
             pendingEmail: isTransitioning ? activeEmailRaw : undefined,
             models,
@@ -120,7 +122,7 @@ function buildAccountCards(localData, trackedQuotas, activeEmailRaw, switchActiv
         cards.push({
             email: trackedQuota.account.email || 'Unknown',
             name: trackedQuota.account.name,
-            isActive: !!(activeEmail && activeEmail === trackedEmail),
+            isActive: !!(effectiveActiveEmail && effectiveActiveEmail === trackedEmail),
             trackingId: trackedQuota.account.id,
             models,
             bottleneck: bottleneckModel,

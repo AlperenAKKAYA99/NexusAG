@@ -17,10 +17,12 @@ import * as https from 'https';
 import * as http from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as vscode from 'vscode';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import {
-    LS_CERT_PATHS, LS_PROCESS_GREP, LS_SERVICE_PATH, CSRF_TOKEN_RE, isWindows,
+    LS_CERT_PATHS, LS_PROCESS_GREP, LS_PROCESS_GREP_LEGACY, LS_SERVICE_PATH,
+    CSRF_TOKEN_RE, isWindows,
     PROCESS_EXEC_TIMEOUT_MS, WMIC_EXEC_TIMEOUT_MS, LSOF_EXEC_TIMEOUT_MS,
     LS_REQUEST_TIMEOUT_MS, DEFAULT_LS_TIMEOUT_MS,
 } from '../constants';
@@ -58,19 +60,94 @@ export interface LsEndpoint {
     csrf: string;
     /** workspace_id from LS process args — used to match the active workspace */
     wsId?: string;
+    /** Workspace paths from agy --add-dir arguments */
+    workspaceDirs?: string[];
+    /** True when the endpoint belongs to an Antigravity ≥ 2.27 `agy --hub` process */
+    isHub?: boolean;
+}
+
+/** Extract all values for a process argument, preserving quoted paths with spaces. */
+export function extractCommandLineArgumentValues(commandLine: string, name: string): string[] {
+    const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(
+        `(?:^|\\s)--${escapedName}(?:=|\\s+)(?:"([^"]*)"|'([^']*)'|([^\\s]+))`,
+        'g',
+    );
+    const values: string[] = [];
+    for (const match of commandLine.matchAll(pattern)) {
+        const value = match[1] ?? match[2] ?? match[3];
+        if (value) values.push(value);
+    }
+    return values;
+}
+
+/** Compare paths using the active platform's path and case rules. */
+export function pathsEqual(left: string, right: string): boolean {
+    const normalizedLeft = path.normalize(left);
+    const normalizedRight = path.normalize(right);
+    return process.platform === 'win32'
+        ? normalizedLeft.toLowerCase() === normalizedRight.toLowerCase()
+        : normalizedLeft === normalizedRight;
+}
+
+/**
+ * Read the current window's `agy --hub` endpoint directly from the built-in
+ * `google.google-antigravity` extension exports (`{ csrfToken, port, client, getRpcClient }`).
+ *
+ * In Antigravity IDE ≥ 2.27.0, the built-in extension spawns `agy --hub` without `--add-dir`
+ * and exposes its exact `port` and `csrfToken` via `extension.exports`. Reading this directly
+ * avoids PowerShell/WMIC process scanning and guarantees window-scoped accuracy even when
+ * multiple IDE windows are open.
+ */
+export function getAgyExtensionEndpoint(): LsEndpoint | null {
+    try {
+        const ext = vscode.extensions.getExtension('google.google-antigravity');
+        if (!ext || !ext.isActive || !ext.exports) return null;
+        const exportsObj = ext.exports as {
+            port?: number | (() => number | undefined);
+            csrfToken?: string;
+            client?: { port?: number; csrfToken?: string };
+        };
+        const rawPort = typeof exportsObj.port === 'function'
+            ? exportsObj.port()
+            : (exportsObj.port ?? exportsObj.client?.port);
+        const csrf = exportsObj.csrfToken ?? exportsObj.client?.csrfToken;
+        if (typeof rawPort === 'number' && Number.isInteger(rawPort) && rawPort > 0 && rawPort <= 65535 && csrf) {
+            return {
+                port: rawPort,
+                csrf,
+                wsId: 'global',
+                isHub: true,
+            };
+        }
+    } catch { /* ignore */ }
+    return null;
 }
 
 // ==================== Process Discovery ====================
 
 /**
  * Find active Language Server processes and extract their HTTPS port + CSRF token
- * directly from process arguments (--https_server_port, --csrf_token).
+ * directly from process arguments.
+ *
+ * Antigravity ≥ 2.27.0:
+ *   1. Fast path: read `{ port, csrfToken }` directly from `google.google-antigravity` extension exports.
+ *   2. Process fallback: `agy.exe --hub --hub-port=PORT --csrf_token=TOKEN`
+ * Pre-2.27.0: `language_server_win --https_server_port=PORT --csrf_token=TOKEN`
+ *   → uses --https_server_port as the HTTPS-only port.
  *
  * Cross-platform: ps on macOS/Linux, wmic on Windows.
  * Returns an empty array (never throws) so callers can safely ignore LS absence.
  */
 export async function findLSEndpoints(): Promise<LsEndpoint[]> {
     try {
+        // ── Phase 0: Direct window-scoped endpoint from google.google-antigravity extension ──
+        const extEndpoint = getAgyExtensionEndpoint();
+        if (extEndpoint) {
+            return [extEndpoint];
+        }
+
+        // ── Phase 1: Try new agy --hub processes ──
         let lines: string[];
         if (isWindows) {
             lines = await getWindowsProcessLines(LS_PROCESS_GREP);
@@ -82,14 +159,80 @@ export async function findLSEndpoints(): Promise<LsEndpoint[]> {
             lines = stdout.trim().split('\n').filter(Boolean);
         }
 
-        return lines.flatMap(line => {
+        // Parse agy --hub lines: --hub-port gives us the port
+        const agyEndpoints = lines.flatMap(line => {
+            if (!line.includes('--hub')) return [];
+            const rawPort = extractCommandLineArgumentValues(line, 'hub-port')[0];
+            const port = rawPort ? Number(rawPort) : 0;
+            const csrf = line.match(CSRF_TOKEN_RE)?.[1];
+            const workspaceDirs = extractCommandLineArgumentValues(line, 'add-dir');
+            return Number.isInteger(port) && port > 0 && port <= 65535 && csrf
+                ? [{ port, csrf, workspaceDirs, isHub: true }]
+                : [];
+        });
+
+        if (agyEndpoints.length > 0) {
+            const workspacePaths = (vscode.workspace.workspaceFolders ?? []).map(folder => folder.uri.fsPath);
+            if (workspacePaths.length > 0 && agyEndpoints.some(endpoint => endpoint.workspaceDirs?.length)) {
+                const matching = agyEndpoints.filter(endpoint =>
+                    endpoint.workspaceDirs?.some(directory =>
+                        workspacePaths.some(workspace => pathsEqual(directory, workspace)),
+                    ),
+                );
+                if (matching.length === 1) return matching;
+                return [];
+            }
+
+            if (agyEndpoints.length > 1 && workspacePaths.length === 0 &&
+                agyEndpoints.some(endpoint => endpoint.workspaceDirs?.length)) {
+                return [];
+            }
+            return agyEndpoints;
+        }
+
+        // ── Phase 2: Legacy fallback ──
+        let legacyLines: string[];
+        if (isWindows) {
+            legacyLines = await getWindowsProcessLines(LS_PROCESS_GREP_LEGACY);
+        } else {
+            const { stdout } = await execAsync(
+                `ps -A -ww -o args | grep "${LS_PROCESS_GREP_LEGACY}" | grep -v grep`,
+                { timeout: LSOF_EXEC_TIMEOUT_MS },
+            );
+            legacyLines = stdout.trim().split('\n').filter(Boolean);
+        }
+
+        return legacyLines.flatMap(line => {
             const port = line.match(/--https_server_port[=\s]+(\d+)/)?.[1];
             const csrf = line.match(CSRF_TOKEN_RE)?.[1];
             const wsId = line.match(/--workspace_id[=\s]+(\S+)/)?.[1];
-            return port && csrf ? [{ port: +port, csrf, wsId }] : [];
+            return port && csrf ? [{ port: +port, csrf, wsId, isHub: false }] : [];
         });
-    } catch { /* expected: JSON parse failure — raw text response */
+    } catch { /* expected: process scan may fail */
         return [];
+    }
+}
+
+/**
+ * Returns true if any Antigravity ≥ 2.27 `agy --hub` process is currently running.
+ */
+export async function isAgyHubActive(): Promise<boolean> {
+    try {
+        const endpoints = await findLSEndpoints();
+        if (endpoints.some(e => e.isHub)) return true;
+        let lines: string[];
+        if (isWindows) {
+            lines = await getWindowsProcessLines(LS_PROCESS_GREP);
+        } else {
+            const { stdout } = await execAsync(
+                `ps -A -ww -o args | grep "${LS_PROCESS_GREP}" | grep -v grep`,
+                { timeout: LSOF_EXEC_TIMEOUT_MS },
+            );
+            lines = stdout.trim().split('\n').filter(Boolean);
+        }
+        return lines.some(line => line.includes('--hub'));
+    } catch {
+        return false;
     }
 }
 
@@ -118,19 +261,39 @@ export function loadLSCert(): Buffer | undefined {
 
 // ==================== HTTP ====================
 
-/**
- * Make a ConnectRPC-style POST to a Language Server endpoint.
- *
- * @param ls       - Endpoint info (port + CSRF token)
- * @param endpoint - Full gRPC path, e.g.
- *                   '/exa.language_server_pb.LanguageServerService/RegisterGdmUser'
- * @param ca       - Optional CA cert.  If omitted TLS verification is skipped.
- */
-export function callLSEndpoint(
-    ls: LsEndpoint,
-    endpoint: string,
-    ca?: Buffer,
-): Promise<Buffer> {
+function callLSEndpointHttp(ls: LsEndpoint, endpoint: string): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+        const httpReq = http.request(
+            {
+                hostname: '127.0.0.1',
+                port: ls.port,
+                path: endpoint,
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/proto',
+                    'Connect-Protocol-Version': '1',
+                    'x-codeium-csrf-token': ls.csrf,
+                    'Content-Length': '0',
+                },
+            },
+            async (res) => {
+                try {
+                    const { status, body } = await collectBuffer(res);
+                    if (status === 200) {
+                        resolve(body);
+                    } else {
+                        reject(new Error(`HTTP ${status}: ${body.toString().substring(0, 200)}`));
+                    }
+                } catch (e) { reject(e); }
+            },
+        );
+        httpReq.on('error', reject);
+        httpReq.setTimeout(LS_REQUEST_TIMEOUT_MS, () => httpReq.destroy(new Error('LS HTTP request timed out')));
+        httpReq.end();
+    });
+}
+
+function callLSEndpointHttps(ls: LsEndpoint, endpoint: string, ca?: Buffer): Promise<Buffer> {
     return new Promise((resolve, reject) => {
         const req = https.request(
             {
@@ -161,6 +324,38 @@ export function callLSEndpoint(
         req.setTimeout(LS_REQUEST_TIMEOUT_MS, () => req.destroy(new Error('LS request timed out')));
         req.end();
     });
+}
+
+/**
+ * Make a ConnectRPC-style POST to a Language Server endpoint.
+ *
+ * Antigravity ≥ 2.27.0 (`ls.isHub === true`): `agy --hub` serves plain HTTP
+ * on `--hub-port` with no TLS cert, so we use HTTP directly and avoid wasted
+ * TLS handshake failures.
+ * Pre-2.27.0: tries HTTPS first, then falls back to HTTP.
+ *
+ * @param ls       - Endpoint info (port + CSRF token)
+ * @param endpoint - Full gRPC path, e.g.
+ *                   '/exa.language_server_pb.LanguageServerService/RegisterGdmUser'
+ * @param ca       - Optional CA cert.  If omitted TLS verification is skipped.
+ */
+export async function callLSEndpoint(
+    ls: LsEndpoint,
+    endpoint: string,
+    ca?: Buffer,
+): Promise<Buffer> {
+    if (ls.isHub) {
+        try {
+            return await callLSEndpointHttp(ls, endpoint);
+        } catch {
+            return callLSEndpointHttps(ls, endpoint, ca);
+        }
+    }
+    try {
+        return await callLSEndpointHttps(ls, endpoint, ca);
+    } catch {
+        return callLSEndpointHttp(ls, endpoint);
+    }
 }
 
 // ==================== Unified LS HTTP Client ====================
@@ -306,4 +501,3 @@ export function callLsHttpsJson(
         req.end();
     });
 }
-

@@ -91,7 +91,7 @@ export declare class UsageStatsService {
      * Returns null if no cache exists (triggers full async fetch instead).
      */
     loadFromDiskCacheSync(): DeepUsageStats | null;
-    /** Scan ~/.gemini/antigravity/brain/ for conversation UUIDs */
+    /** Scan ~/.gemini/antigravity/brain/ (and legacy antigravity-ide/brain/) for conversation UUIDs */
     private discoverConversationIds;
     /** Extract TokenEntry[] from metadata items array */
     private extractEntries;

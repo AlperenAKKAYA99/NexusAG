@@ -39,7 +39,7 @@ const crypto = __importStar(require("crypto"));
 const constants_1 = require("../constants");
 const googleAuth_1 = require("../services/googleAuth");
 const quotaApi_1 = require("../services/quotaApi");
-const tokenExportFormatter_1 = require("../shared/tokenExportFormatter");
+const auth_1 = require("../services/auth");
 const logger_1 = require("../utils/logger");
 const log = (0, logger_1.createLogger)('AccountManager');
 class AccountManager {
@@ -57,6 +57,9 @@ class AccountManager {
     // --- Lifecycle ---
     async initialize() {
         this.accounts = this.context.globalState.get(constants_1.ACCOUNTS_LIST_KEY, []);
+        for (const acc of this.accounts) {
+            (0, auth_1.suppressTermsNotice)(acc.email, this.context).catch(() => { });
+        }
     }
     // --- Account CRUD ---
     getAccounts() {
@@ -173,9 +176,11 @@ class AccountManager {
      * Tokens can be an array of strings, or a multi-line / delimited string.
      */
     async addAccountsByTokens(input) {
-        const tokens = Array.isArray(input)
-            ? [...new Set(input.flatMap(t => (0, tokenExportFormatter_1.extractTokens)(t)))]
-            : (0, tokenExportFormatter_1.extractTokens)(input);
+        const rawTokens = (Array.isArray(input) ? input : input.split(/[\r\n\s,;]+/))
+            .map(t => t.trim())
+            .filter(t => t.length > 0);
+        // Deduplicate tokens
+        const tokens = [...new Set(rawTokens)];
         if (tokens.length === 0) {
             return { total: 0, successCount: 0, failedCount: 0, results: [] };
         }
@@ -300,27 +305,6 @@ class AccountManager {
         }
         return null;
     }
-    /**
-     * Get refresh tokens for multiple accounts in bulk.
-     * Parallel lookup without network calls (reads from OS SecretStorage).
-     */
-    async getRefreshTokensBulk(idsOrEmails) {
-        return Promise.all(idsOrEmails.map(async (idOrEmail) => {
-            const cleanId = idOrEmail.replace(/^active:/, '').trim().toLowerCase();
-            const account = this.accounts.find(a => a.id.toLowerCase() === cleanId ||
-                (a.email && a.email.toLowerCase() === cleanId));
-            const email = account?.email || (cleanId.includes('@') ? cleanId : undefined);
-            const name = account?.name;
-            const id = account?.id || idOrEmail;
-            try {
-                const token = await this.getRefreshToken(idOrEmail);
-                return { id, email, name, token };
-            }
-            catch (err) {
-                return { id, email, name, token: null, error: err?.message || String(err) };
-            }
-        }));
-    }
     // --- DRY Helpers ---
     /**
      * Create or update an account with fresh tokens.
@@ -349,6 +333,7 @@ class AccountManager {
                 vscode.window.showInformationMessage(`✅ Account added: ${email}`);
             status = 'added';
         }
+        await (0, auth_1.suppressTermsNotice)(email, this.context).catch(() => { });
         if (!skipNotifyEvent) {
             this._onDidChange.fire();
         }

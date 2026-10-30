@@ -46,6 +46,8 @@ const usage_components_1 = require("./shared/usage-components");
 const litellmPricing_1 = require("./services/litellmPricing");
 const conversationTracker_1 = require("./services/conversationTracker");
 const conversationGuard_1 = require("./services/conversationGuard");
+const agPaths_1 = require("./shared/agPaths");
+const auth_1 = require("./services/auth");
 const lsClient_1 = require("./utils/lsClient");
 const logger_1 = require("./utils/logger");
 const i18n_1 = require("./i18n");
@@ -66,6 +68,12 @@ async function activate(context) {
     const accountManager = new accountManager_1.AccountManager(context);
     accountManager.initialize();
     const quotaManager = new quotaManager_1.QuotaManager(context, accountManager);
+    // Suppress recurring "Security Notice & Data Use" prompt for active account
+    quotaManager.getActiveEmail().then(email => {
+        if (email) {
+            (0, auth_1.suppressTermsNotice)(email, context).catch(() => { });
+        }
+    }).catch(() => { });
     // Non-blocking USS API check
     quotaManager.getSwitchService().testApiAccess().then(ok => {
         log.info(`USS API: ${ok ? '✅ available' : '❌ not available'}`);
@@ -149,40 +157,6 @@ async function activate(context) {
         if (success) {
             quotaManager.refresh();
         }
-    }), vscode.commands.registerCommand('ag.copyTokens', async () => {
-        const accounts = accountManager.getAccounts();
-        if (accounts.length === 0) {
-            vscode.window.showWarningMessage((0, i18n_1.t)('export.noneFound'));
-            return;
-        }
-        const items = accounts.map(a => ({
-            id: a.id,
-            label: `$(account) ${a.email}`,
-            description: a.name !== a.email ? a.name : undefined,
-            picked: true,
-        }));
-        const selected = await vscode.window.showQuickPick(items, {
-            title: (0, i18n_1.t)('export.title'),
-            placeHolder: (0, i18n_1.t)('export.desc'),
-            canPickMany: true,
-            ignoreFocusOut: true,
-        });
-        if (!selected || selected.length === 0)
-            return;
-        // Format QuickPick
-        const formatItems = [
-            { id: 'plain', label: (0, i18n_1.t)('export.formatPlain'), description: '1//0eAAA...\n1//0eBBB...' },
-            { id: 'labeled', label: (0, i18n_1.t)('export.formatLabeled'), description: '# user@example.com\n1//0eAAA...' },
-            { id: 'json', label: (0, i18n_1.t)('export.formatJson'), description: '[ { "email": "...", "refresh_token": "..." } ]' },
-        ];
-        const defaultFormat = vscode.workspace.getConfiguration('ag-switchboard').get('tokenExport.defaultFormat', 'plain');
-        const chosenFormatItem = await vscode.window.showQuickPick(formatItems, {
-            title: (0, i18n_1.t)('export.format'),
-            placeHolder: formatItems.find(f => f.id === defaultFormat)?.label || formatItems[0].label,
-            ignoreFocusOut: true,
-        });
-        const chosenFormat = (chosenFormatItem?.id || defaultFormat);
-        await quotaManager.copyTokens(selected.map(s => s.id), chosenFormat);
     }), vscode.commands.registerCommand('ag.openUsageStats', () => {
         usageStatsPanel_1.UsageStatsPanel.createOrShow(context.extensionUri, quotaManager.getLastUsageStats());
         if (usageStatsPanel_1.UsageStatsPanel.currentPanel) {
@@ -199,6 +173,10 @@ async function activate(context) {
             quotaManager.fetchContextWindowOnce(cascadeId);
         }
     }), vscode.commands.registerCommand('ag.fixConversations', async () => {
+        if ((0, agPaths_1.isAgyHubStorage)()) {
+            vscode.window.showInformationMessage((0, i18n_1.t)('notify.noMissingConv'));
+            return;
+        }
         const status = await convGuard.detect();
         const count = status?.missing ?? 0;
         const msg = count > 0

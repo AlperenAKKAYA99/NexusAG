@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
-import { callLsJson } from '../utils/lsClient';
+import { callLsJson, isAgyHubActive } from '../utils/lsClient';
+import { isAgyHubStorage } from '../shared/agPaths';
 import { PollLock } from '../utils/pollLock';
 import { AccountQuota, AccountCard, LocalQuotaData, ServerInfo, ViewState, DeepUsageStats } from '../types';
 import { AccountManager } from './accountManager';
@@ -19,8 +20,6 @@ import { getUSS } from '../utils/uss';
 import { QuotaViewProvider } from '../providers/quotaViewProvider';
 import { ConversationGuard } from '../services/conversationGuard';
 import { createLogger } from '../utils/logger';
-import { t } from '../i18n';
-import { formatTokens, TokenExportFormat, TokenExportEntry } from '../shared/tokenExportFormatter';
 
 const log = createLogger('QuotaManager');
 
@@ -469,7 +468,7 @@ export class QuotaManager {
                 if (cachedStats) this.lastUsageStats = cachedStats;
             }
 
-            const activeEmail = activeEmailHint ?? await this.getActiveEmail();
+            const activeEmail = activeEmailHint ?? (localResult?.userStatus?.email || await this.getActiveEmail());
             this.lastActiveEmail = activeEmail;
 
             log.info(`refresh: ${Date.now() - startTime}ms local=${!!localResult} tracked=${trackedResult.length} (remoteFetched=${shouldFetchRemote})`);
@@ -625,55 +624,34 @@ export class QuotaManager {
         }
 
         const cfg = vscode.workspace.getConfiguration('ag-switchboard');
-        const switchWithFix = cfg.get<boolean>('switchWithFixConversations', true);
+        const hubMode = (await isAgyHubActive()) || isAgyHubStorage();
+        const switchWithFix = !hubMode && cfg.get<boolean>('switchWithFixConversations', true);
+        const confirmSwitch = cfg.get<boolean>('confirmSwitch', false);
 
-        const modalDetail = switchWithFix
-            ? 'Antigravity will switch to this account, rebuild the sidebar conversation index (Fix Missing Conversations), and relaunch automatically.'
-            : undefined;
+        if (confirmSwitch || switchWithFix) {
+            const modalDetail = switchWithFix
+                ? 'Antigravity will switch to this account, rebuild the sidebar conversation index (Fix Missing Conversations), and relaunch automatically.'
+                : undefined;
 
-        const confirm = await vscode.window.showWarningMessage(
-            `Switch IDE account to ${account.email}?`,
-            modalDetail ? { modal: true, detail: modalDetail } : { modal: true },
-            'Switch',
-        );
-        if (confirm !== 'Switch') return;
+            const confirm = await vscode.window.showWarningMessage(
+                `Switch IDE account to ${account.email}?`,
+                modalDetail ? { modal: true, detail: modalDetail } : { modal: true },
+                'Switch',
+            );
+            if (confirm !== 'Switch') return;
+        }
 
         // Abort previous switch (double-click protection)
         this.switchController?.abort();
         this.switchController = new AbortController();
 
         try {
-            if (switchWithFix && this.convGuard) {
-                vscode.window.showInformationMessage(`🔄 Switching to ${account.email} and rebuilding conversation index...`);
-
-                await this.switchService.applyAccountCredentials({
-                    email: account.email,
-                    name: account.name,
-                    accessToken: tokens.access_token,
-                    refreshToken: tokens.refresh_token,
-                    expiryTimestamp: tokens.expiry_timestamp,
-                });
-
-                this.lastActiveEmail = account.email;
-                log.info(`switchAccount (with Fix Conversations): applied credentials for ${account.email}, triggering fix worker`);
-
-                this.convGuard.runFix({
-                    authStatus: {
-                        name: account.name,
-                        email: account.email,
-                        apiKey: tokens.access_token,
-                        userStatusProtoBinaryBase64: this.switchService.buildUserStatusProto(account.name, account.email),
-                    },
-                });
-                return;
-            }
-
             const result = await this.switchService.switchAccount({
                 email: account.email, name: account.name, accessToken: tokens.access_token,
                 refreshToken: tokens.refresh_token, expiryTimestamp: tokens.expiry_timestamp,
             });
             if (result.confirmed) {
-                this.lastActiveEmail = account.email;
+                this.lastActiveEmail = result.activeEmail || account.email;
                 log.info(`switchAccount: confirmed ${account.email}`);
 
                 try {
@@ -690,23 +668,61 @@ export class QuotaManager {
                 }
 
                 this.pushCachedData();
+                if (switchWithFix && this.convGuard) {
+                    vscode.window.showInformationMessage(
+                        `✅ Switched to ${account.email}. Rebuilding the conversation index and restarting Antigravity...`,
+                    );
+                    this.convGuard.runFix({
+                        authStatus: {
+                            name: account.name,
+                            email: account.email,
+                            apiKey: tokens.access_token,
+                            userStatusProtoBinaryBase64: this.switchService.buildUserStatusProto(account.name, account.email),
+                        },
+                    });
+                    return;
+                }
                 setTimeout(() => this.refresh(), QuotaManager.POST_SWITCH_REFRESH_DELAY);
             } else {
-                // USS state was set but LS unavailable — will recover on next LS restart
-                log.warn(`switchAccount: unconfirmed for ${account.email}`);
-                this.lastActiveEmail = account.email;
+                // Keep the actual active identity reported by the Hub / LS.
+                log.warn(`switchAccount: unconfirmed for ${account.email} (backend=${result.backend})`);
+                this.lastActiveEmail = result.activeEmail || await this.getActiveEmail();
                 this.cachedServer = null;
+                this.pushCachedData();
+                setTimeout(() => this.refresh(), QuotaManager.POST_SWITCH_REFRESH_DELAY);
+
+                if (!hubMode && this.convGuard) {
+                    const restart = await vscode.window.showWarningMessage(
+                        `Antigravity is still signed in as ${this.lastActiveEmail || 'the previous account'}. A full restart may be required to switch to ${account.email}.`,
+                        'Restart Antigravity',
+                    );
+                    if (restart === 'Restart Antigravity') {
+                        this.convGuard.runFix({
+                            authStatus: {
+                                name: account.name,
+                                email: account.email,
+                                apiKey: tokens.access_token,
+                                userStatusProtoBinaryBase64: this.switchService.buildUserStatusProto(account.name, account.email),
+                            },
+                        });
+                    }
+                } else if (!result.guidedSignIn) {
+                    vscode.window.showInformationMessage(
+                        `Antigravity remains signed in as ${this.lastActiveEmail || 'the current account'}.`,
+                    );
+                }
             }
+        } catch (error: any) {
+            log.error(`switchAccount failed for ${account.email}:`, error?.message || error);
+            vscode.window.showErrorMessage(`Failed to switch to ${account.email}: ${error?.message || error}`);
         } finally {
             this.switchController = null;
         }
     }
 
-    /**
-     * Resolves a refresh token for an account id or email with USS and SwitchService fallbacks.
-     */
-    async resolveAccountRefreshToken(accountIdOrEmail: string): Promise<string | null> {
-        let token = await this.accountManager.getRefreshToken(accountIdOrEmail);
+    /** Copy refresh_token to clipboard for sharing */
+    async copyToken(accountId: string): Promise<void> {
+        let token = await this.accountManager.getRefreshToken(accountId);
 
         // Fallback 1: check active session via USS if this is the active account
         if (!token) {
@@ -729,146 +745,12 @@ export class QuotaManager {
             token = this.switchService.getActiveRefreshToken();
         }
 
-        return token || null;
-    }
-
-    /** Copy refresh_token to clipboard for sharing */
-    async copyToken(accountId: string): Promise<boolean> {
-        const token = await this.resolveAccountRefreshToken(accountId);
-
         if (!token) {
-            vscode.window.showErrorMessage(t('notify.noTokenFound'));
-            return false;
+            vscode.window.showErrorMessage('❌ No token found for this account');
+            return;
         }
         await vscode.env.clipboard.writeText(token);
-        vscode.window.showInformationMessage(t('notify.tokenCopied'));
-        return true;
-    }
-
-    /**
-     * Copy multiple refresh tokens to clipboard in the specified format.
-     * Webview or caller sends account IDs (or empty for all).
-     */
-    async copyTokens(
-        accountIds?: string[],
-        format: TokenExportFormat = 'plain'
-    ): Promise<{
-        total: number;
-        copiedCount: number;
-        missingCount: number;
-        copiedEmails: string[];
-        missingEmails: string[];
-    }> {
-        const trackedAccounts = this.accountManager.getAccounts();
-
-        // Determine targets: specific accounts or all
-        let targets: Array<{ id: string; email: string; name?: string }>;
-        if (accountIds && accountIds.length > 0) {
-            targets = [];
-            for (const id of accountIds) {
-                const cleanId = id.replace(/^active:/, '').trim().toLowerCase();
-                const matched = trackedAccounts.find(a =>
-                    a.id.toLowerCase() === cleanId ||
-                    (a.email && a.email.toLowerCase() === cleanId)
-                );
-                if (matched) {
-                    targets.push({ id: matched.id, email: matched.email, name: matched.name });
-                } else if (cleanId.includes('@') || cleanId === 'active') {
-                    // Local active account or direct email
-                    const localEmail = this.lastLocalData?.userStatus?.email || (cleanId.includes('@') ? cleanId : 'active');
-                    targets.push({ id, email: localEmail });
-                }
-            }
-        } else {
-            // All tracked accounts + local active account if not already in tracked
-            targets = trackedAccounts.map(a => ({ id: a.id, email: a.email, name: a.name }));
-            const localEmail = this.lastLocalData?.userStatus?.email;
-            if (localEmail && !targets.some(t => t.email.toLowerCase() === localEmail.toLowerCase())) {
-                targets.unshift({ id: 'active', email: localEmail });
-            }
-        }
-
-        if (targets.length === 0) {
-            vscode.window.showWarningMessage(t('export.noneFound'));
-            return { total: 0, copiedCount: 0, missingCount: 0, copiedEmails: [], missingEmails: [] };
-        }
-
-        // Optional confirmation dialog if bulk (more than 1) and confirmBulkCopy is enabled
-        const confirmBulk = vscode.workspace.getConfiguration('ag-switchboard').get<boolean>('tokenExport.confirmBulkCopy', true);
-        if (targets.length > 1 && confirmBulk) {
-            const copyBtn = t('export.copy_other', { count: targets.length });
-            const answer = await vscode.window.showWarningMessage(
-                t('notify.bulkCopyConfirm', { count: targets.length }),
-                { modal: true, detail: t('export.securityWarning') },
-                copyBtn
-            );
-            if (answer !== copyBtn) {
-                return { total: targets.length, copiedCount: 0, missingCount: 0, copiedEmails: [], missingEmails: [] };
-            }
-        }
-
-        const entries: TokenExportEntry[] = [];
-        const copiedEmails: string[] = [];
-        const missingEmails: string[] = [];
-
-        for (const target of targets) {
-            const token = await this.resolveAccountRefreshToken(target.id);
-            if (token) {
-                entries.push({
-                    email: target.email,
-                    name: target.name,
-                    token,
-                });
-                copiedEmails.push(target.email);
-            } else {
-                missingEmails.push(target.email);
-            }
-        }
-
-        if (entries.length === 0) {
-            vscode.window.showErrorMessage(t('export.noneFound'));
-            return {
-                total: targets.length,
-                copiedCount: 0,
-                missingCount: missingEmails.length,
-                copiedEmails: [],
-                missingEmails,
-            };
-        }
-
-        const formatted = formatTokens(entries, format);
-        await vscode.env.clipboard.writeText(formatted);
-
-        // Security auto-clear clipboard timer if configured
-        const clearSeconds = vscode.workspace.getConfiguration('ag-switchboard').get<number>('tokenExport.clearClipboardSeconds', 0);
-        if (clearSeconds > 0) {
-            setTimeout(async () => {
-                try {
-                    const current = await vscode.env.clipboard.readText();
-                    if (current === formatted) {
-                        await vscode.env.clipboard.writeText('');
-                        vscode.window.showInformationMessage(t('notify.clipboardCleared'));
-                    }
-                } catch { /* ignore */ }
-            }, clearSeconds * 1000);
-        }
-
-        // Summary notification
-        if (entries.length === 1 && missingEmails.length === 0) {
-            vscode.window.showInformationMessage(t('notify.tokenCopied'));
-        } else if (missingEmails.length === 0) {
-            vscode.window.showInformationMessage(t('notify.tokensCopied', { count: entries.length }));
-        } else {
-            vscode.window.showWarningMessage(t('export.partial', { copied: entries.length, missing: missingEmails.length }));
-        }
-
-        return {
-            total: targets.length,
-            copiedCount: entries.length,
-            missingCount: missingEmails.length,
-            copiedEmails,
-            missingEmails,
-        };
+        vscode.window.showInformationMessage('🔑 Token copied to clipboard');
     }
 
     // ── Workspace Cascade Ownership ────────────────────────────
@@ -934,7 +816,7 @@ export class QuotaManager {
     }
 
     /** Delegate to EmailResolver */
-    private async getActiveEmail(): Promise<string> {
+    public async getActiveEmail(): Promise<string> {
         return this.emailResolver.getActiveEmail();
     }
 
