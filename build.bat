@@ -54,8 +54,9 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-:: 4.5 Clean previous .vsix packages
+:: 4.5 Clean previous .vsix packages and checksums
 if exist "*.vsix" del /q "*.vsix"
+if exist "SHA256SUMS.txt" del /q "SHA256SUMS.txt"
 
 :: 5. Package VSIX
 echo [*] Packaging .vsix extension...
@@ -66,9 +67,18 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
+:: 5.5 Generate SHA256 Checksum
+echo [*] Generating SHA256SUMS.txt...
+call node scripts/generate-checksum.js
+if %errorlevel% neq 0 (
+    echo [ERROR] Checksum generation failed!
+    pause
+    exit /b 1
+)
+
 echo.
 echo ========================================================
-echo   [SUCCESS] VSIX package built successfully.
+echo   [SUCCESS] VSIX package and checksum built successfully.
 echo ========================================================
 echo.
 
@@ -80,7 +90,10 @@ for %%F in (*.vsix) do (
     set "VSIX_PATH=%%~fF"
     set "VSIX_SIZE=%%~zF"
 )
-echo Package: !VSIX_NAME! [!VSIX_SIZE! bytes]
+echo Package:  !VSIX_NAME! [!VSIX_SIZE! bytes]
+if exist "SHA256SUMS.txt" (
+    for /f "usebackq tokens=*" %%C in ("SHA256SUMS.txt") do echo SHA256:   %%C
+)
 
 :: Check for --install parameter
 if "%1"=="--install" goto install_ext

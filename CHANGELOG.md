@@ -2,6 +2,16 @@
 
 All notable changes to **NexusAG** are documented here.
 
+## [1.3.5] — 2026-10-30
+
+### Fixed
+- **Resolved CI/CD `npm ci` Failure (E404 Missing Tarball)** — Fixed the GitHub Actions build pipeline crash caused by a non-existent `cockatiel@3.2.2` tarball reference in `package-lock.json`. Locked `cockatiel` to verified registry release `3.2.1` with matching sha512 integrity, restoring clean, automated headless builds on `ubuntu-latest`.
+- **Cryptographic SSH Signature Alignment for GitHub Vigilant Mode** — Resolved GitHub's Vigilant Mode ("Flag unsigned commits") unverified alert. Configured ED25519 commit and tag signing infrastructure, aligned the local `allowed_signers` configuration to eliminate signature verification mismatches, and cryptographically verified all release commits and tags.
+
+### Improved
+- **GitHub Actions Release Workflow Synchronization** — Hardened the CI/CD release trigger (`release.yml`) to ensure tag-based builds always checkout and package the exact cryptographically signed release commit, eliminating stale tag cache issues.
+- **Automated VSIX Packaging & Integrity Verification** — Standardized release asset distribution with automatic `.vsix` bundle generation and SHA-256 checksum reporting (`SHA256SUMS.txt`) for verifiable, tamper-proof releases.
+
 ## [1.3.4] — 2026-10-30
 
 ### Added

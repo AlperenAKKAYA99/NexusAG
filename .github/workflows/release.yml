@@ -36,5 +36,7 @@ jobs:
       - name: Upload VSIX to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ steps.vsix.outputs.file }}
+          files: |
+            ${{ steps.vsix.outputs.file }}
+            SHA256SUMS.txt
           generate_release_notes: true

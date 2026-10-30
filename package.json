@@ -3,7 +3,7 @@
   "displayName": "NexusAG",
   "description": "Switch between Antigravity accounts instantly. Monitor AI quotas, token budgets and reset timers — all in one sidebar panel.",
   "icon": "assets/icon.png",
-  "version": "1.3.4",
+  "version": "1.3.5",
   "publisher": "AlperenAKKAYA99",
   "license": "MIT",
   "repository": {
@@ -197,7 +197,7 @@
     "compile:webview": "node esbuild.webview.mjs",
     "watch": "node scripts/sync-version.js && tsc -watch -p ./tsconfig.extension.json",
     "watch:webview": "node esbuild.webview.mjs --watch",
-    "package": "node scripts/sync-version.js && npm run compile:extension && node esbuild.webview.mjs --production && vsce package --no-dependencies",
+    "package": "node scripts/sync-version.js && npm run compile:extension && node esbuild.webview.mjs --production && vsce package --no-dependencies && node scripts/generate-checksum.js",
     "publish:ovsx": "ovsx publish *.vsix"
   },
   "devDependencies": {
